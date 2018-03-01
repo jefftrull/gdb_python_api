@@ -73,6 +73,9 @@ class StackPrinter:
     # for a given list of items (args or locals)
     def __stackmap(self, frame_items):
         symbolmap = defaultdict(list)
+        if not frame_items:
+            return symbolmap
+
         for i in frame_items:
             name = i.symbol().name
             addr = self._frame.read_var(name).address
