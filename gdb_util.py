@@ -38,14 +38,10 @@ class StackPrinter:
         # from there to *(rbp+0x8), exclusive, is the range of possible args
         if args.keys():
             first_arg_addr = max(args.keys())    # the one with the highest address
-            for addr in range(first_arg_addr,
-                              self._frame.read_register('rbp')+0x8,
-                              -0x8):
-                addr_hex = '0x{:02x}'.format(addr)
-                result = result + "\n" + addr_hex
-                # Is this address associated with an arg?
-                if addr in args:
-                    result = result + " " + yellow + ",".join([sym.name for sym in args[addr]]) + reset_color
+            result = result + self.__subframe_display(first_arg_addr,
+                                                      self._frame.read_register('rbp')+0x8,
+                                                      args,
+                                                      yellow)
 
         # *(rbp+0x8) is the stored old IP
         cyan = "\u001b[36m"
@@ -58,16 +54,42 @@ class StackPrinter:
 
         # print rest of stack, displaying locals
         green = "\u001b[32m"
-        for addr in range(self._frame.read_register('rbp')-0x8,
-                          self._frame.read_register('sp')-0x8,
-                          -0x8):
-            addr_hex = '0x{:02x}'.format(addr)
-            result = result + "\n" + addr_hex
-            if addr in locls:
-                result = result + " " + green + ",".join([sym.name for sym in locls[addr]]) + reset_color
+        result = result + self.__subframe_display(self._frame.read_register('rbp')-0x8,
+                                                  self._frame.read_register('sp')-0x8,
+                                                  locls,
+                                                  green)
+
         result = result + cyan + " <<< top of stack" + reset_color
 
         return result
+
+    # display a range of stack addresses with colors, and compression of unknown contents as "stuff"
+    def __subframe_display(self, start, end, frame_items, col):
+        magenta = "\u001b[35m"
+        reset_color = "\u001b[0m"
+        empty_start = None
+        result = ""
+        for addr in range(start, end, -0x8):
+            addr_hex = '0x{:02x}'.format(addr)
+            if addr in frame_items:
+                if empty_start:
+                    # we just completed an empty range
+                    if empty_start != (addr+0x8):
+                        result = result + magenta + ' (through 0x{:02x})'.format(addr+0x8) + reset_color
+                    empty_start = None
+                result = result + "\n" + addr_hex
+                result = result + " " + col + ",".join([sym.name for sym in frame_items[addr]]) + reset_color
+            elif empty_start is None:
+                # we are starting an empty range
+                empty_start = addr
+                result = result + "\n" + addr_hex + magenta + " stuff" + reset_color
+
+        if empty_start and (empty_start != end+0x8):
+            # the empty range has more than one dword and extended through the end of the subframe
+            result = result + magenta + ' (through ' + str(end+0x8) + ')' + reset_color
+
+        return result
+
 
     # produce a dict mapping addresses to symbol lists
     # for a given list of items (args or locals)
