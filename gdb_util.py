@@ -89,3 +89,18 @@ class StackPrinter:
                 for saddr in range(addr, addr+sz, 0x8):
                     symbolmap[int(saddr)].append(i.symbol())
         return symbolmap
+
+# Now create a gdb command that prints the current stack:
+class PrintFrame (gdb.Command):
+    """Display the stack memory layout for the current frame"""
+
+    def __init__ (self):
+        super (PrintFrame, self).__init__ ("pframe", gdb.COMMAND_STACK)
+
+    def invoke (self, arg, from_tty):
+        try:
+            print(StackPrinter(gdb.newest_frame()))
+        except gdb.error:
+            print("gdb got an error. Maybe we are not currently running?")
+
+PrintFrame ()
