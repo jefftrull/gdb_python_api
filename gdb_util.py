@@ -37,10 +37,13 @@ class StackPrinter:
         # some basic frame stats
         if self._frame.function() is not None:
             result = result + "in " + self._frame.function().name
+            if self._frame.type() is gdb.INLINE_FRAME:
+                # recursively show inlining until we find a "real" parent frame
+                result = result + "\ninlined with" + str(StackPrinter(self._frame.older()))
         else:
             result = result + "<unknown function>"
-        if not self._frame.type() == gdb.NORMAL_FRAME:
-            # IDK what to do
+        if (self._frame.type() != gdb.NORMAL_FRAME):
+            # IDK what else to do
             return result
 
         locls = self.__stackmap(self._decorator.frame_locals())
