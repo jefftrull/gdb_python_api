@@ -1,4 +1,24 @@
 # Some utility functions for working with gdb
+# Copyright (c) 2018 Jeff Trull
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import gdb
 from gdb.FrameDecorator import FrameDecorator
 from collections import defaultdict
@@ -47,7 +67,8 @@ class StackPrinter:
         cyan = "\u001b[36m"
         result = result + "\n" + str(self._frame.read_register('rbp')+0x8) + " return address"
         voidstarstar = gdb.lookup_type("void").pointer().pointer()
-        result = result + cyan + " (" + str((self._frame.read_register('rbp')+0x8).cast(voidstarstar).dereference()) + ")" + reset_color
+        old_ip = (self._frame.read_register('rbp')+0x8).cast(voidstarstar).dereference()
+        result = result + cyan + " (" + str(old_ip) + ")" + reset_color
 
         # *(rbp) is the old RBP
         result = result + "\n" + str(self._frame.read_register('rbp')+0x0) + " saved rbp"
@@ -64,7 +85,10 @@ class StackPrinter:
         return result
 
     # display a range of stack addresses with colors, and compression of unknown contents as "stuff"
-    def __subframe_display(self, start, end, frame_items, col):
+    def __subframe_display(self,
+                           start, end,   # range of addresses to display
+                           frame_items,  # map from addresses to lists of symbols
+                           col):         # color to use for the symbols
         magenta = "\u001b[35m"
         reset_color = "\u001b[0m"
         empty_start = None
