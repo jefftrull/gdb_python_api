@@ -23,7 +23,7 @@ import gdb
 from gdb.FrameDecorator import FrameDecorator
 from collections import defaultdict
 
-class StackPrinter:
+class FramePrinter:
     """Make ASCII art from a stack frame"""
 
     def __init__(self, frame):
@@ -39,7 +39,7 @@ class StackPrinter:
             result = result + "in " + self._frame.function().name
             if self._frame.type() is gdb.INLINE_FRAME:
                 # recursively show inlining until we find a "real" parent frame
-                result = result + "\ninlined with" + str(StackPrinter(self._frame.older()))
+                result = result + "\ninlined with" + str(FramePrinter(self._frame.older()))
         else:
             result = result + "<unknown function>"
         if (self._frame.type() != gdb.NORMAL_FRAME):
@@ -148,7 +148,7 @@ class PrintFrame (gdb.Command):
 
     def invoke (self, arg, from_tty):
         try:
-            print(StackPrinter(gdb.newest_frame()))
+            print(FramePrinter(gdb.newest_frame()))
         except gdb.error:
             print("gdb got an error. Maybe we are not currently running?")
 
