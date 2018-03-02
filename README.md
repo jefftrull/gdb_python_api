@@ -12,6 +12,11 @@ This feature gives you a view of the contents of the current stack frame, showin
 Breakpoint 1, main (argc=1, argv=0x7fffffffddf8) at...
 (gdb) watch $rsp if $_regex($_as_string($rip), ".* <target_fn")
 Watchpoint 2: $rsp
+(gdb) commands 2
+Type commands for breakpoint(s) 2, one per line.
+End with a line saying just "end".
+>pframe
+>end
 (gdb) continue
 ~~~
 
