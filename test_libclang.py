@@ -32,28 +32,37 @@ compdb = cindex.CompilationDatabase.fromDirectory(compilation_database_path)
 
 # Step 2: query compilation flags
 try:
-    file_args = compdb.getCompileCommands(source_file_path)
+    cmds = compdb.getCompileCommands(source_file_path)
 
 except cindex.CompilationDatabaseError:
     print ('Could not load compilation flags for', source_file_path)
 
-# print out loaded flags
+# assuming only one command is required to build
+cmd = cmds.__getitem__(0)
 
-# For some reason clang on Ubuntu 17.04 cannot find stddef.h when using libstdc++
-# This workaround was plucked from gcc's default include paths:
-file_args = ['-isystem/usr/lib/gcc/x86_64-linux-gnu/7/include',
-             '-std=c++11']     # support lambdas
-translation_unit = index.parse(source_file_path, file_args)
+# filter irrelevant command line components
+args = []
+arg_gen = cmd.arguments
+next(arg_gen)            # remove compiler executable path
+for arg in arg_gen:
+    if arg == '-c':
+        # if we don't drop the -c input filename we get a TU parse error...
+        next(arg_gen)    # drop input filename
+    elif arg == '-o':
+        next(arg_gen)    # drop output filename
+    else:
+        args.append(arg)
+
+translation_unit = index.parse(source_file_path, args)
+
 if (len(translation_unit.diagnostics) > 0):
     print(['%s:%s'%(x.category_name, x.spelling) for x in translation_unit.diagnostics])
+
+# Step 3: print AST starting at our target
+
 # we can go from TU's primary cursor to a specific file location with:
 cur = cindex.Cursor.from_location(translation_unit,
                                   cindex.SourceLocation.from_position(translation_unit,
                                                                       translation_unit.get_file(source_file_path),
-                                                                      26, 5))
+                                                                      26, 1))
 AST_from_node(cur)
-
-
-# ACTION PLAN
-# Deal with options properly
-# produce identical output from both Python and C++ versions

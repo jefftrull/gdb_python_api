@@ -39,6 +39,43 @@ private:
     CXString s_;
 };
 
+// stateful visitor for displaying hierarchy
+struct PrintingVisitor {
+    PrintingVisitor(unsigned depth = 0) : depth_(depth) {}
+
+    static CXChildVisitResult
+    visit(CXCursor cursor,
+          CXCursor parent,
+          CXClientData data) {
+        // rebind "this" from c-style client data
+        auto visitor = reinterpret_cast<PrintingVisitor*>(data);
+        visitor->print(cursor);
+
+        PrintingVisitor child_vis(visitor->depth_+1);
+        clang_visitChildren(cursor,
+                            &PrintingVisitor::visit,
+                            &child_vis);
+        return CXChildVisit_Continue;
+    }
+
+    void print(CXCursor cursor) {
+        // get location in file
+        CXString fn;
+        unsigned line;
+        unsigned column;
+        CXSourceLocation loc = clang_getCursorLocation(cursor);
+        clang_getPresumedLocation(loc, &fn, &line, &column);
+        std::cout << std::string(depth_, '-') << ' ';
+        std::cout << "CursorKind." << AutoDisposedString(clang_getCursorKindSpelling(cursor.kind));
+        std::cout << ':' << AutoDisposedString(clang_getCursorSpelling(cursor));
+        std::cout << "@(" << line << "," << column << ")\n";
+    }
+
+private:
+
+    unsigned depth_;
+};
+
 int main() {
     CXCompilationDatabase_Error err;
     CXCompilationDatabase cdb = clang_CompilationDatabase_fromDirectory("/home/jet/oss/gdb_python_api/build", &err);
@@ -50,23 +87,21 @@ int main() {
     CXCompileCommands cmds = clang_CompilationDatabase_getCompileCommands(cdb, ourfn);
     // fill out the array of char ptrs clang_parseTranslationUnit wants to see
     CXCompileCommand cmd = clang_CompileCommands_getCommand(cmds, 0);   // assuming there is only one
-    std::vector<const char *> cmdstrs(clang_CompileCommand_getNumArgs(cmd));
-    std::cerr << "args from compilation db:\n";
-    for (auto i = 0; i < clang_CompileCommand_getNumArgs(cmd); ++i) {
-        cmdstrs[i] = clang_getCString(clang_CompileCommand_getArg(cmd, i));
-        std::cerr << cmdstrs[i] << "\n";
+    std::vector<const char *> cmdstrs;
+    for (unsigned cmdno = 1; cmdno < clang_CompileCommand_getNumArgs(cmd); ++cmdno) {
+        if (std::string(clang_getCString(clang_CompileCommand_getArg(cmd, cmdno))) == "-c") {
+            // skip input filename
+            ++cmdno;
+        } else if (std::string(clang_getCString(clang_CompileCommand_getArg(cmd, cmdno))) == "-o") {
+            // skip output filename
+            ++cmdno;
+        } else {
+            cmdstrs.push_back(clang_getCString(clang_CompileCommand_getArg(cmd, cmdno)));
+        }
     }
-    std::cerr << "=================\n";
 
     CXIndex index = clang_createIndex(0, 1);
     CXTranslationUnit tu;
-    // somehow, supplying the original compile command arguments here causes downstream code to generate two compile "jobs"
-    // with the same arguments
-    // not sure why and it may be an issue later
-    cmdstrs.clear();
-    // this is required in the Python version but not here (!)
-    // cmdstrs.push_back("-std=c++11");
-    cmdstrs.push_back("-isystem/usr/lib/gcc/x86_64-linux-gnu/7/include");
     CXErrorCode errc = clang_parseTranslationUnit2(index, ourfn,
                                                    cmdstrs.data(),
                                                    cmdstrs.size(),
@@ -83,30 +118,17 @@ int main() {
         std::cerr << "parsing flagged " << diagCount << " diagnostics\n";
     }
 
-    CXSourceLocation startloc = clang_getLocation(tu, clang_getFile(tu, ourfn), 26, 5);
+    CXSourceLocation startloc = clang_getLocation(tu, clang_getFile(tu, ourfn), 26, 1);
     CXCursor cur = clang_getCursor(tu, startloc);
     // If we want to do the whole file
     // CXCursor cur = clang_getTranslationUnitCursor(tu);
-    auto kindName = AutoDisposedString(clang_getCursorKindSpelling(cur.kind));
-    std::cout << "top level cursor is of kind " << kindName << "\n";
 
-    // visit its direct children
+    // print hierarchy from this point
+    PrintingVisitor().print(cur);
+    PrintingVisitor vis(1);
     clang_visitChildren(cur,
-                        [](CXCursor cursor,
-                           CXCursor parent,
-                           CXClientData data) {
-                            CXString fn;
-                            unsigned line;
-                            unsigned column;
-                            CXSourceLocation loc = clang_getCursorLocation(cursor);
-                            clang_getPresumedLocation(loc, &fn, &line, &column);
-                            std::cout << "kind " << AutoDisposedString(clang_getCursorKindSpelling(cursor.kind));
-                            std::cout << " @ (" << line << ", " << column << ") ";
-                            std::cout << AutoDisposedString(clang_getCursorSpelling(cursor)) << "\n";
-
-                            return CXChildVisit_Recurse;
-                        },
-                        nullptr);   // client_data
+                        &PrintingVisitor::visit,
+                        &vis);
 
     // clean up resources
     clang_disposeTranslationUnit(tu);
