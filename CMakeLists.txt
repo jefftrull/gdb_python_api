@@ -29,7 +29,7 @@ add_executable( swl stl_with_lambda.cpp )
 #
 
 # libClang via the C API
-add_executable( le libclang_experiment.cpp )
+add_executable( le libclang_test.cpp )
 
 # libClang via Python
 # In Ubuntu python-clang package is only in Python 2.7 search paths, while gdb uses Python 3
@@ -68,7 +68,7 @@ endif()
 enable_testing()
 
 add_test( NAME libclang_via_python
-  COMMAND ../test_libclang.py ${CMAKE_CURRENT_SOURCE_DIR}/stl_with_lambda.cpp ./compile_commands.json )
+  COMMAND ../libclang_test.py ${CMAKE_CURRENT_SOURCE_DIR}/stl_with_lambda.cpp ./compile_commands.json )
 add_test( NAME libclang_via_c
   COMMAND ./le ${CMAKE_CURRENT_SOURCE_DIR}/stl_with_lambda.cpp ./compile_commands.json )
 
