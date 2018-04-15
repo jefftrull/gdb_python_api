@@ -18,6 +18,10 @@ if( NOT CMAKE_BUILD_TYPE )
   set( CMAKE_BUILD_TYPE Debug )
 endif()
 
+#
+# Code we will be operating on
+#
+
 # stack dump demonstration code
 add_executable( ll lotsa_locals.cpp )
 
@@ -30,6 +34,8 @@ add_executable( swl stl_with_lambda.cpp )
 
 # libClang via the C API
 add_executable( le libclang_test.cpp )
+
+find_package( Boost 1.65 REQUIRED )
 
 # libClang via Python
 # In Ubuntu python-clang package is only in Python 2.7 search paths, while gdb uses Python 3
@@ -61,6 +67,8 @@ else()
   set( CLANG_LIB_DIR ${LLVM_BASE_DIR}/lib )
   target_link_libraries( le PUBLIC ${CLANG_LIB_DIR}/libclang.so )
 endif()
+
+target_link_libraries( le PRIVATE Boost::boost )
 
 # some "tests" that just exercise the libClang users enough to show they are working
 # (and to provide usage examples)

@@ -24,6 +24,8 @@
 #include <vector>
 #include <memory>
 
+#include <boost/preprocessor/stringize.hpp>
+
 #include <clang-c/CXCompilationDatabase.h>
 #include <clang-c/Index.h>
 
@@ -88,6 +90,12 @@ int main() {
     // fill out the array of char ptrs clang_parseTranslationUnit wants to see
     CXCompileCommand cmd = clang_CompileCommands_getCommand(cmds, 0);   // assuming there is only one
     std::vector<const char *> cmdstrs;
+
+#ifdef LLVM_ROOT
+    // add include path to the (compiler-defined) headers like stddef.h
+    cmdstrs.push_back( "-isystem" BOOST_PP_STRINGIZE(LLVM_ROOT) "/tools/clang/lib/Headers" );
+#endif
+
     for (unsigned cmdno = 1; cmdno < clang_CompileCommand_getNumArgs(cmd); ++cmdno) {
         if (std::string(clang_getCString(clang_CompileCommand_getArg(cmd, cmdno))) == "-c") {
             // skip input filename
@@ -116,6 +124,7 @@ int main() {
     auto diagCount = clang_getNumDiagnostics(tu);
     if (diagCount) {
         std::cerr << "parsing flagged " << diagCount << " diagnostics\n";
+        exit(1);
     }
 
     CXSourceLocation startloc = clang_getLocation(tu, clang_getFile(tu, ourfn), 26, 1);
