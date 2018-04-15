@@ -22,6 +22,10 @@
 import gdb
 from gdb.FrameDecorator import FrameDecorator
 from collections import defaultdict
+import sys
+from os import path
+sys.path.append(path.dirname(__file__))   # look in *this* directory for others
+from libclang_helpers import getASTNode
 
 class FramePrinter:
     """Make ASCII art from a stack frame"""
@@ -153,3 +157,21 @@ class PrintFrame (gdb.Command):
             print("gdb got an error. Maybe we are not currently running?")
 
 PrintFrame ()
+
+# Set breakpoints on "downstream" user code, continue until you reach one, then remove breakpoints
+class StepUser (gdb.Command):
+    """Step to the next user code"""
+
+    def __init__ (self):
+        super (StepUser, self).__init__ ("stepu", gdb.COMMAND_BREAKPOINTS)
+
+    def invoke (self, arg, from_tty):
+        try:
+            node = getASTNode(gdb.newest_frame().find_sal().symtab.filename,
+                              gdb.newest_frame().find_sal().line,
+                              1)
+            import pdb;pdb.set_trace()
+        except gdb.error:
+            print("gdb got an error. Maybe we are not currently running?")
+
+StepUser ()
