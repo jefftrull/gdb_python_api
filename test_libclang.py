@@ -1,13 +1,16 @@
-#!/usr/bin/python2
-# python-clang package is only in Python 2.7 search paths...
-# gdb supports both IIRC
+#!/usr/bin/python
+# to run this from gdb:
+# python
+# > import sys
+# > sys.argv=['../test_libclang.py', '/home/jet/oss/gdb_python_api/stl_with_lambda.cpp', './compile_commands.json']
+# > exec(open('../test_libclang.py').read())
 
 # this code was inspired/copied from a lot of places but most notably
 # https://stackoverflow.com/questions/36652540/how-to-use-compile-commands-json-with-clang-python-bindings
 # and then I hacked it.
 
-from argparse import ArgumentParser, FileType
 from clang import cindex
+from argparse import ArgumentParser, FileType
 from os import path
 
 def AST_from_node(node, lvl=0):
@@ -64,5 +67,5 @@ if (len(translation_unit.diagnostics) > 0):
 cur = cindex.Cursor.from_location(translation_unit,
                                   cindex.SourceLocation.from_position(translation_unit,
                                                                       translation_unit.get_file(source_file_path),
-                                                                      26, 1))
+                                                                      26, 1))  # hardcoded to my point of interest
 AST_from_node(cur)
