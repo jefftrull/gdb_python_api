@@ -26,7 +26,7 @@ import sys
 import re
 from os import path
 sys.path.append(path.dirname(__file__))   # look in *this* directory for others
-from libclang_helpers import getASTNode, getFuncName
+from libclang_helpers import getASTNode, getASTSibling, getFuncName
 # BOZO move this kind of thing into libclang_helpers
 from clang import cindex
 
@@ -168,7 +168,10 @@ class StepUser (gdb.Command):
     def __init__ (self):
         super (StepUser, self).__init__ ("stepu", gdb.COMMAND_BREAKPOINTS)
 
+    finishBP = None       # for remembering where to resume
+
     def invoke (self, arg, from_tty):
+        parent = None
         try:
             # find the AST node closest to the beginning of the current line
             line = gdb.newest_frame().find_sal().line
@@ -177,7 +180,16 @@ class StepUser (gdb.Command):
             # If the location of this node is prior to the current line, it probably represents
             # the parent to our desired node. Find the first child at or after our desired location.
             if node.location.line < line:
+                parent = node
                 node = next(cur for cur in node.get_children() if cur.location.line >= line)
+            elif node.kind == cindex.CursorKind.FUNCTION_DECL:
+                # the body is a compound statement at the end of the children
+                parent = node
+                node = list(parent.get_children())[-1]
+                if node.kind == cindex.CursorKind.COMPOUND_STMT and len(list(node.get_children())) > 0:
+                    # grab the first statement
+                    parent = node
+                    node = next(parent.get_children())
 
             # Flag error if none
             if node is None:
@@ -194,6 +206,21 @@ class StepUser (gdb.Command):
         # turn them into gdb breakpoints
         breakpoints = [gdb.Breakpoint('%s:%d'%x, internal=True) for x in breakpoints]
 
+        # set a "finish" breakpoint for the node following ours in the AST
+        # i.e., the next child of the CompoundStmt
+        # or the end of the frame, if we are the last
+        nextStmt = getASTSibling(parent, node)
+        if nextStmt is None:
+            if not gdb.selected_frame() == gdb.newest_frame():
+                # create default finish breakpoint
+                finishBP = gdb.FinishBreakpoint(internal=True)  # on by default in case no other breakpoints happen
+            else:
+                # no point in doing finish breakpoint in main (or top level thread fn)
+                finishBP = None
+        else:
+            # use nextStmt info to set breakpoint
+            finishBP = gdb.Breakpoint('%s:%d'%(nextStmt.location.file.name, nextStmt.location.line), internal=True)
+
         # continue until breakpoint hit
         err = None
         try:
@@ -204,6 +231,14 @@ class StepUser (gdb.Command):
         # delete our breakpoints
         for bp in breakpoints:
             bp.delete()
+
+        if finishBP and finishBP.is_valid():
+            # disable "finish" breakpoint
+            finishBP.enabled = False
+        else:
+            # we must have hit this guard breakpoint
+            # there is nowhere to continue to
+            finishBP = None
 
         # rethrow any errors
         if err:
@@ -282,7 +317,6 @@ class StepUser (gdb.Command):
                 if body.kind is cindex.CursorKind.COMPOUND_STMT:
                     methods.append(body)
 
-        import pdb;pdb.set_trace()
         return methods
 
 

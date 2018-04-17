@@ -67,6 +67,22 @@ def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
 
     return cur
 
+# supply the next sibling of a statement (for e.g. implementing "next")
+def getASTSibling(parent, node):
+    if parent.kind is not cindex.CursorKind.COMPOUND_STMT:
+        # don't know what to do here
+        raise RuntimeError('AST node on line %d is not a child of a compound statement - cannot determine next statement'%node.location.line)
+    sibling = None
+    child_it = parent.get_children()
+    for child in child_it:
+        if child == node:
+            try:
+                sibling = next(child_it)
+            except StopIteration:
+                pass   # just means there is no next sibling
+            break
+    return sibling
+
 # given a CALL_EXPR, find the namespace-qualified name of the function
 def getFuncName(node):
     nm = node.spelling
