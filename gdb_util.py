@@ -23,9 +23,12 @@ import gdb
 from gdb.FrameDecorator import FrameDecorator
 from collections import defaultdict
 import sys
+import re
 from os import path
 sys.path.append(path.dirname(__file__))   # look in *this* directory for others
-from libclang_helpers import getASTNode
+from libclang_helpers import getASTNode, getFuncName
+# BOZO move this kind of thing into libclang_helpers
+from clang import cindex
 
 class FramePrinter:
     """Make ASCII art from a stack frame"""
@@ -167,11 +170,128 @@ class StepUser (gdb.Command):
 
     def invoke (self, arg, from_tty):
         try:
+            # find the AST node closest to the beginning of the current line
+            line = gdb.newest_frame().find_sal().line
             node = getASTNode(gdb.newest_frame().find_sal().symtab.filename,
-                              gdb.newest_frame().find_sal().line,
-                              1)
+                              line, 1)
+            # If the location of this node is prior to the current line, it probably represents
+            # the parent to our desired node. Find the first child at or after our desired location.
+            if node.location.line < line:
+                node = next(cur for cur in node.get_children() if cur.location.line >= line)
+
+            # Flag error if none
+            if node is None:
+                raise RuntimeError('Cannot find breakpoint location for line %d'%line)
+
+            bps = self._breakInFunctions(node)
             import pdb;pdb.set_trace()
+
         except gdb.error:
             print("gdb got an error. Maybe we are not currently running?")
+
+    # call expressions are a bit funny
+    # I experimented with the AST a bit to come up with these:
+
+    @staticmethod
+    def _getMemberBody(node):
+        # member function calls have a weird structure:
+        # the CALL_EXPR has one UNEXPOSED_EXPR child, which in turn has a CALL_EXPR child
+        # which has a MEMBER_REF_EXPR child
+        if node.kind is not cindex.CursorKind.CALL_EXPR:
+            return None
+        if len(list(node.get_children())) != 1 or next(node.get_children()).kind != cindex.CursorKind.UNEXPOSED_EXPR:
+            return None
+        unexp_node = next(node.get_children())
+        if len(list(unexp_node.get_children())) != 1 or next(unexp_node.get_children()).kind != cindex.CursorKind.CALL_EXPR:
+            return None
+        gchild_node = next(unexp_node.get_children())
+        # now we have a CALL_EXPR. The first child should be information about the function itself
+        if len(list(gchild_node.get_children())) != 1 or next(gchild_node.get_children()).kind != cindex.CursorKind.MEMBER_REF_EXPR:
+            return None
+
+        # Now we want this CALL_EXPR's referenced definition (which we know is a member function)
+        if not gchild_node.referenced or len(list(gchild_node.referenced.get_children())) != 2:
+            return None
+        child_it = gchild_node.referenced.get_children()
+        next(child_it)     # discard declaration stuff, for now
+        body = next(child_it)
+        if body.kind is not cindex.CursorKind.COMPOUND_STMT:
+            return None
+
+        return body     # got it!
+
+    @staticmethod
+    def _getLambdaBody(node):
+        # CALL_EXPR with one UNEXPOSED_EXPR child, which in turn has a LAMBDA_EXPR child
+        if node.kind is not cindex.CursorKind.CALL_EXPR:
+            return None
+        if len(list(node.get_children())) != 1 or next(node.get_children()).kind is not cindex.CursorKind.UNEXPOSED_EXPR:
+            return None
+        unexp_node = next(node.get_children())
+        if len(list(unexp_node.get_children())) != 1 or next(unexp_node.get_children()).kind is not cindex.CursorKind.LAMBDA_EXPR:
+            return None
+        lexpr = next(unexp_node.get_children())
+        # the *last* child should be the body
+        body = list(lexpr.get_children())[-1]
+        if body.kind is not cindex.CursorKind.COMPOUND_STMT:
+            return None
+        return body
+
+    @staticmethod
+    def _getFunctionBody(node):
+        # a regular named function seems to get the simplest treatment:
+        # you can use "referenced" to get the definition
+        if not node.referenced:
+            return None
+
+        if len(list(node.referenced.get_children())) == 0:
+            return None   # we at least need a body node
+
+        body = list(node.referenced.get_children())[-1]
+        if body.kind is not cindex.CursorKind.COMPOUND_STMT:
+            return None   # not sure why this would ever be true but...
+
+        return body
+
+
+    # set breakpoints on downstream
+    @staticmethod
+    def _breakInFunctions(node):
+        breakpoints = []
+
+        # If the child is an "unexposed expression" find its child.
+        if node.kind.is_unexposed():
+            # Flag error if none or more than one
+            if len(list(node.get_children())) != 1:
+                raise RuntimeError('Unexposed expression at line %d has more than one child, unsure how to handle'%node.location.line)
+            node = next(node.get_children())
+
+        if node.kind.is_unexposed():
+            raise RuntimeError('parent and child AST nodes both unexposed at line %d'%node.location.line)
+
+        if node.kind == cindex.CursorKind.CALL_EXPR:
+            # check for member function call
+            body = StepUser._getMemberBody(node)
+            if body is None:
+                # maybe it's a plain function
+                body = StepUser._getFunctionBody(node)
+
+            if body:
+                # implement breakpoint pattern match here:
+                if re.match('^std::', getFuncName(body.semantic_parent)):
+                    body = None
+            else:
+                # try lambda
+                body = StepUser._getLambdaBody(node)
+
+            if body:
+                first_stmt = next(body.get_children())
+                breakpoints.append((first_stmt.location.file, first_stmt.location.line))
+
+            # walk through the children
+            for arg in node.get_arguments():
+                breakpoints = breakpoints + StepUser._breakInFunctions(arg)
+
+        return breakpoints
 
 StepUser ()

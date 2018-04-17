@@ -35,8 +35,7 @@ def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
         cmds = compdb.getCompileCommands(fname)
 
     except cindex.CompilationDatabaseError:
-        print ('Could not load compilation flags for', fname)
-        # BOZO throw
+        raise RuntimeError('Could not load compilation flags for %s'%fname)
 
     # assuming only one command is required to build
     cmd = cmds.__getitem__(0)
@@ -58,7 +57,7 @@ def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
 
     if (len(translation_unit.diagnostics) > 0):
         print(['%s:%s'%(x.category_name, x.spelling) for x in translation_unit.diagnostics])
-        # BOZO throw here
+        raise RuntimeError('Failure during libclang parsing')
 
     # we can go from TU's primary cursor to a specific file location with:
     cur = cindex.Cursor.from_location(translation_unit,
@@ -67,3 +66,13 @@ def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
                                                                           line, column))
 
     return cur
+
+# given a CALL_EXPR, find the namespace-qualified name of the function
+def getFuncName(node):
+    nm = node.spelling
+    node = node.referenced   # jump to function definition
+    while node and node.semantic_parent and node.semantic_parent.kind is not cindex.CursorKind.TRANSLATION_UNIT and node.semantic_parent.spelling:
+        # accumulate namespaces ("semantic parents" of definition, until TU reached)
+        nm = '%s::%s'%(node.semantic_parent.spelling, nm)
+        node = node.semantic_parent
+    return nm
