@@ -213,13 +213,13 @@ class StepUser (gdb.Command):
         if nextStmt is None:
             if not gdb.selected_frame() == gdb.newest_frame():
                 # create default finish breakpoint
-                finishBP = gdb.FinishBreakpoint(internal=True)  # on by default in case no other breakpoints happen
+                StepUser.finishBP = gdb.FinishBreakpoint(internal=True)  # on by default in case no other breakpoints happen
             else:
                 # no point in doing finish breakpoint in main (or top level thread fn)
-                finishBP = None
+                StepUser.finishBP = None
         else:
             # use nextStmt info to set breakpoint
-            finishBP = gdb.Breakpoint('%s:%d'%(nextStmt.location.file.name, nextStmt.location.line), internal=True)
+            StepUser.finishBP = gdb.Breakpoint('%s:%d'%(nextStmt.location.file.name, nextStmt.location.line), internal=True)
 
         # continue until breakpoint hit
         err = None
@@ -232,13 +232,13 @@ class StepUser (gdb.Command):
         for bp in breakpoints:
             bp.delete()
 
-        if finishBP and finishBP.is_valid():
+        if StepUser.finishBP and StepUser.finishBP.is_valid():
             # disable "finish" breakpoint
-            finishBP.enabled = False
+            StepUser.finishBP.enabled = False
         else:
             # we must have hit this guard breakpoint
             # there is nowhere to continue to
-            finishBP = None
+            StepUser.finishBP = None
 
         # rethrow any errors
         if err:
@@ -369,4 +369,19 @@ class StepUser (gdb.Command):
 
         return breakpoints
 StepUser ()
+
+# Continue to the end of the expression stepped into by the last StepUser
+class FinishUser (gdb.Command):
+    """Run forward to the end of the expression stepped into with stepu"""
+
+    def __init__ (self):
+        super (FinishUser, self).__init__ ("finishu", gdb.COMMAND_BREAKPOINTS)
+
+    def invoke (self, arg, from_tty):
+        if StepUser.finishBP and StepUser.finishBP.is_valid():
+            StepUser.finishBP.enabled = True
+            gdb.execute("continue")
+        else:
+            print('no previous stepu command found')
+FinishUser()
 
