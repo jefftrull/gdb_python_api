@@ -253,6 +253,18 @@ class StepUser (gdb.Command):
 
         return body
 
+    @staticmethod
+    def _getMethodBodies(node):
+        methods = []
+        for m in node.get_children():
+            if m.kind is cindex.CursorKind.CXX_METHOD:
+                body = next(m.get_children())
+                if body.kind is cindex.CursorKind.COMPOUND_STMT:
+                    methods.append(body)
+
+        import pdb;pdb.set_trace()
+        return methods
+
 
     # set breakpoints on downstream
     @staticmethod
@@ -291,6 +303,17 @@ class StepUser (gdb.Command):
             # walk through the children
             for arg in node.get_arguments():
                 breakpoints = breakpoints + StepUser._breakInFunctions(arg)
+
+        if node.kind == cindex.CursorKind.DECL_REF_EXPR:
+            import pdb;pdb.set_trace()
+            # probably an object argument
+            # check type against regex
+            decl = node.referenced.type.get_declaration()
+            if not re.match('^std::', getFuncName(decl)):
+                # locate member function bodies and breakpoint
+                members = [next(x.get_children()) for x in StepUser._getMethodBodies(decl)]
+                breakpoints.append([(x.location.file, x.location.line) for x in members])
+
 
         return breakpoints
 
