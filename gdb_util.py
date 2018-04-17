@@ -183,11 +183,31 @@ class StepUser (gdb.Command):
             if node is None:
                 raise RuntimeError('Cannot find breakpoint location for line %d'%line)
 
-            bps = self._breakInFunctions(node)
-            import pdb;pdb.set_trace()
+            breakpoints = self._breakInFunctions(node)
 
         except gdb.error:
-            print("gdb got an error. Maybe we are not currently running?")
+            print("gdb got an error trying to find our location. Maybe we are not currently running?")
+
+        # ensure we don't duplicate any breakpoints
+        breakpoints = list(set(breakpoints))
+
+        # turn them into gdb breakpoints
+        breakpoints = [gdb.Breakpoint('%s:%d'%x, internal=True) for x in breakpoints]
+
+        # continue until breakpoint hit
+        err = None
+        try:
+            gdb.execute("continue")
+        except gdb.error as e:
+            err = e
+
+        # delete our breakpoints
+        for bp in breakpoints:
+            bp.delete()
+
+        # rethrow any errors
+        if err:
+            raise err
 
     # call expressions are a bit funny
     # I experimented with the AST a bit to come up with these:
@@ -298,23 +318,21 @@ class StepUser (gdb.Command):
 
             if body:
                 first_stmt = next(body.get_children())
-                breakpoints.append((first_stmt.location.file, first_stmt.location.line))
+                breakpoints.append((first_stmt.location.file.name, first_stmt.location.line))
 
             # walk through the children
             for arg in node.get_arguments():
                 breakpoints = breakpoints + StepUser._breakInFunctions(arg)
 
         if node.kind == cindex.CursorKind.DECL_REF_EXPR:
-            import pdb;pdb.set_trace()
             # probably an object argument
             # check type against regex
             decl = node.referenced.type.get_declaration()
             if not re.match('^std::', getFuncName(decl)):
                 # locate member function bodies and breakpoint
                 members = [next(x.get_children()) for x in StepUser._getMethodBodies(decl)]
-                breakpoints.append([(x.location.file, x.location.line) for x in members])
-
+                breakpoints = breakpoints + [(x.location.file.name, x.location.line) for x in members]
 
         return breakpoints
-
 StepUser ()
+
