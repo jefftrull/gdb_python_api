@@ -168,7 +168,9 @@ class StepUser (gdb.Command):
     def __init__ (self):
         super (StepUser, self).__init__ ("stepu", gdb.COMMAND_BREAKPOINTS)
 
+    # class globals
     finishBP = None       # for remembering where to resume
+    stepRegex = None      # for identifying "library" (skippable) calls
 
     def invoke (self, arg, from_tty):
         parent = None
@@ -344,7 +346,7 @@ class StepUser (gdb.Command):
 
             if body:
                 # implement breakpoint pattern match here:
-                if re.match('^std::', getFuncName(body.semantic_parent)):
+                if re.match(StepUser.stepRegex, getFuncName(body.semantic_parent)):
                     body = None
             else:
                 # try lambda
@@ -362,7 +364,7 @@ class StepUser (gdb.Command):
             # probably an object argument
             # check type against regex
             decl = node.referenced.type.get_declaration()
-            if not re.match('^std::', getFuncName(decl)):
+            if not re.match(StepUser.stepRegex, getFuncName(decl)):
                 # locate member function bodies and breakpoint
                 members = [next(x.get_children()) for x in StepUser._getMethodBodies(decl)]
                 breakpoints = breakpoints + [(x.location.file.name, x.location.line) for x in members]
@@ -384,4 +386,27 @@ class FinishUser (gdb.Command):
         else:
             print('no previous stepu command found')
 FinishUser()
+
+# Allow users to specify regex used in stepping
+class StepUserIgnoreRegex (gdb.Parameter):
+    """Regex for functions/classes to skip through when stepping"""
+
+    set_doc = "set this to skip different library namespaces etc."
+    show_doc = "show this to see the currently skipped library namespaces etc."
+
+    def __init__ (self):
+        super (StepUserIgnoreRegex, self).__init__ ("stepu-ignore-regex",
+                                                    gdb.COMMAND_BREAKPOINTS,
+                                                    gdb.PARAM_STRING_NOESCAPE)
+        StepUser.stepRegex = '^std::'   # default
+
+    # required API
+    def get_set_string(self):
+        StepUser.stepRegex = self.value
+        return StepUser.stepRegex
+
+    def get_show_string(self, svalue):
+        return StepUser.stepRegex
+
+StepUserIgnoreRegex()
 
