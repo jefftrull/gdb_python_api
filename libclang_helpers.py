@@ -22,8 +22,9 @@
 from clang import cindex
 from os import path
 
-# A function to find the first AST node for a given file and line
 def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
+    """Find the enclosing AST node of a given file and line"""
+
     compilation_database_path = path.dirname(compdb_fname)
     index = cindex.Index.create()
 
@@ -69,6 +70,8 @@ def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
 
 # supply the next sibling of a statement (for e.g. implementing "next")
 def getASTSibling(parent, node):
+    """Return the next sibling of a node in the AST, if present"""
+
     if parent.kind is not cindex.CursorKind.COMPOUND_STMT:
         # don't know what to do here
         raise RuntimeError('AST node on line %d is not a child of a compound statement - cannot determine next statement'%node.location.line)
@@ -83,8 +86,9 @@ def getASTSibling(parent, node):
             break
     return sibling
 
-# given a CALL_EXPR, find the namespace-qualified name of the function
 def getFuncName(node):
+    """Return the namespace-qualified name of the function in a CALL_EXPR"""
+
     nm = node.spelling
     node = node.referenced   # jump to function definition
     while node and node.semantic_parent and node.semantic_parent.kind is not cindex.CursorKind.TRANSLATION_UNIT and node.semantic_parent.spelling:
