@@ -409,3 +409,38 @@ class StepUserIgnoreRegex (gdb.Parameter):
 
 StepUserIgnoreRegex()
 
+# define a stack frame filter
+class UserFilter:
+    """Filter library functions out of stack trace"""
+
+    def __init__(self):
+        # set required attributes
+        self.name = 'UserFilter'
+        self.enabled = True
+        self.priority = 0
+
+        # register with current program space
+        # (manual suggests avoiding global filter list; this seems appropriate)
+        gdb.current_progspace().frame_filters[self.name] = self
+
+    @staticmethod
+    def __cond_squash(iterable, squashfn):
+        """wrap iterator to compress subsequences for which a predicate is true, keeping only the *last* of each"""
+        last = None              # we have to buffer 1 item
+        for item in iterable:
+            if squashfn(item):
+                last = item
+            else:
+                if last is not None:
+                    yield last   # empty buffer this time
+                    last = None
+                yield item       # resume un-squashed iteration
+        if last is not None:
+            yield last           # in case we end in "squashed" mode
+
+    def filter(self, frame_iter):
+        # wrap the current iterator in a squash-matching-subsequences iterator
+        # with the predicate "function name matches regex"
+        return UserFilter.__cond_squash(frame_iter, lambda x : re.match(StepUser.stepRegex, x.function()))
+
+UserFilter()
