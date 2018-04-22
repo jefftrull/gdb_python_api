@@ -27,8 +27,7 @@ import re
 from os import path
 sys.path.append(path.dirname(__file__))   # look in *this* directory for others
 from libclang_helpers import getASTNode, getASTSibling, getFuncName
-# BOZO move this kind of thing into libclang_helpers
-from clang import cindex
+from clang.cindex import CursorKind
 
 class FramePrinter:
     """Make ASCII art from a stack frame"""
@@ -184,11 +183,11 @@ class StepUser (gdb.Command):
             if node.location.line < line:
                 parent = node
                 node = next(cur for cur in node.get_children() if cur.location.line >= line)
-            elif node.kind == cindex.CursorKind.FUNCTION_DECL:
+            elif node.kind == CursorKind.FUNCTION_DECL:
                 # the body is a compound statement at the end of the children
                 parent = node
                 node = list(parent.get_children())[-1]
-                if node.kind == cindex.CursorKind.COMPOUND_STMT and len(list(node.get_children())) > 0:
+                if node.kind == CursorKind.COMPOUND_STMT and len(list(node.get_children())) > 0:
                     # grab the first statement
                     parent = node
                     node = next(parent.get_children())
@@ -254,16 +253,16 @@ class StepUser (gdb.Command):
         # member function calls have a weird structure:
         # the CALL_EXPR has one UNEXPOSED_EXPR child, which in turn has a CALL_EXPR child
         # which has a MEMBER_REF_EXPR child
-        if node.kind is not cindex.CursorKind.CALL_EXPR:
+        if node.kind is not CursorKind.CALL_EXPR:
             return None
-        if len(list(node.get_children())) != 1 or next(node.get_children()).kind != cindex.CursorKind.UNEXPOSED_EXPR:
+        if len(list(node.get_children())) != 1 or next(node.get_children()).kind != CursorKind.UNEXPOSED_EXPR:
             return None
         unexp_node = next(node.get_children())
-        if len(list(unexp_node.get_children())) != 1 or next(unexp_node.get_children()).kind != cindex.CursorKind.CALL_EXPR:
+        if len(list(unexp_node.get_children())) != 1 or next(unexp_node.get_children()).kind != CursorKind.CALL_EXPR:
             return None
         gchild_node = next(unexp_node.get_children())
         # now we have a CALL_EXPR. The first child should be information about the function itself
-        if len(list(gchild_node.get_children())) != 1 or next(gchild_node.get_children()).kind != cindex.CursorKind.MEMBER_REF_EXPR:
+        if len(list(gchild_node.get_children())) != 1 or next(gchild_node.get_children()).kind != CursorKind.MEMBER_REF_EXPR:
             return None
 
         # Now we want this CALL_EXPR's referenced definition (which we know is a member function)
@@ -272,7 +271,7 @@ class StepUser (gdb.Command):
         child_it = gchild_node.referenced.get_children()
         next(child_it)     # discard declaration stuff, for now
         body = next(child_it)
-        if body.kind is not cindex.CursorKind.COMPOUND_STMT:
+        if body.kind is not CursorKind.COMPOUND_STMT:
             return None
 
         return body     # got it!
@@ -280,17 +279,17 @@ class StepUser (gdb.Command):
     @staticmethod
     def _getLambdaBody(node):
         # CALL_EXPR with one UNEXPOSED_EXPR child, which in turn has a LAMBDA_EXPR child
-        if node.kind is not cindex.CursorKind.CALL_EXPR:
+        if node.kind is not CursorKind.CALL_EXPR:
             return None
-        if len(list(node.get_children())) != 1 or next(node.get_children()).kind is not cindex.CursorKind.UNEXPOSED_EXPR:
+        if len(list(node.get_children())) != 1 or next(node.get_children()).kind is not CursorKind.UNEXPOSED_EXPR:
             return None
         unexp_node = next(node.get_children())
-        if len(list(unexp_node.get_children())) != 1 or next(unexp_node.get_children()).kind is not cindex.CursorKind.LAMBDA_EXPR:
+        if len(list(unexp_node.get_children())) != 1 or next(unexp_node.get_children()).kind is not CursorKind.LAMBDA_EXPR:
             return None
         lexpr = next(unexp_node.get_children())
         # the *last* child should be the body
         body = list(lexpr.get_children())[-1]
-        if body.kind is not cindex.CursorKind.COMPOUND_STMT:
+        if body.kind is not CursorKind.COMPOUND_STMT:
             return None
         return body
 
@@ -305,7 +304,7 @@ class StepUser (gdb.Command):
             return None   # we at least need a body node
 
         body = list(node.referenced.get_children())[-1]
-        if body.kind is not cindex.CursorKind.COMPOUND_STMT:
+        if body.kind is not CursorKind.COMPOUND_STMT:
             return None   # not sure why this would ever be true but...
 
         return body
@@ -314,9 +313,9 @@ class StepUser (gdb.Command):
     def _getMethodBodies(node):
         methods = []
         for m in node.get_children():
-            if m.kind is cindex.CursorKind.CXX_METHOD:
+            if m.kind is CursorKind.CXX_METHOD:
                 body = next(m.get_children())
-                if body.kind is cindex.CursorKind.COMPOUND_STMT:
+                if body.kind is CursorKind.COMPOUND_STMT:
                     methods.append(body)
 
         return methods
@@ -337,7 +336,7 @@ class StepUser (gdb.Command):
         if node.kind.is_unexposed():
             raise RuntimeError('parent and child AST nodes both unexposed at line %d'%node.location.line)
 
-        if node.kind == cindex.CursorKind.CALL_EXPR:
+        if node.kind == CursorKind.CALL_EXPR:
             # check for member function call
             body = StepUser._getMemberBody(node)
             if body is None:
@@ -360,7 +359,7 @@ class StepUser (gdb.Command):
             for arg in node.get_arguments():
                 breakpoints = breakpoints + StepUser._breakInFunctions(arg)
 
-        if node.kind == cindex.CursorKind.DECL_REF_EXPR:
+        if node.kind == CursorKind.DECL_REF_EXPR:
             # probably an object argument
             # check type against regex
             decl = node.referenced.type.get_declaration()
