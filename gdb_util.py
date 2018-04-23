@@ -39,7 +39,7 @@ class FramePrinter:
 
     def __init__(self, frame):
         self._frame = frame
-        self._decorator = gdb.FrameDecorator(self._frame)
+        self._decorator = gdb.FrameDecorator.FrameDecorator(self._frame)
 
     def __str__(self):
         if not self._frame.is_valid():
@@ -415,7 +415,7 @@ class StepUserIgnoreRegex (gdb.Parameter):
 StepUserIgnoreRegex()
 
 # define a stack frame decorator to make them less verbose
-class CommonAliasDecorator(gdb.FrameDecorator):
+class CommonAliasDecorator(gdb.FrameDecorator.FrameDecorator):
     def __init__(self, fobj):
         super(CommonAliasDecorator, self).__init__(fobj)
 
