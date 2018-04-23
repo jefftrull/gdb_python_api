@@ -20,10 +20,15 @@
 # SOFTWARE.
 
 import gdb
-from gdb.FrameDecorator import FrameDecorator
 from collections import defaultdict
-import sys
-import re
+import sys, re
+# Python 2/3 way to get "imap", suggested by SO
+try:
+    from itertools import imap
+except ImportError:
+    # Python3
+    imap = map
+
 from os import path
 sys.path.append(path.dirname(__file__))   # look in *this* directory for others
 from libclang_helpers import getASTNode, getASTSibling, getFuncName
@@ -34,7 +39,7 @@ class FramePrinter:
 
     def __init__(self, frame):
         self._frame = frame
-        self._decorator = FrameDecorator(self._frame)
+        self._decorator = gdb.FrameDecorator(self._frame)
 
     def __str__(self):
         if not self._frame.is_valid():
@@ -397,7 +402,7 @@ class StepUserIgnoreRegex (gdb.Parameter):
         super (StepUserIgnoreRegex, self).__init__ ("stepu-ignore-regex",
                                                     gdb.COMMAND_BREAKPOINTS,
                                                     gdb.PARAM_STRING_NOESCAPE)
-        StepUser.stepRegex = '^std::'   # default
+        StepUser.stepRegex = '^(std::|__gnu)'   # default
 
     # required API
     def get_set_string(self):
@@ -408,6 +413,29 @@ class StepUserIgnoreRegex (gdb.Parameter):
         return StepUser.stepRegex
 
 StepUserIgnoreRegex()
+
+# define a stack frame decorator to make them less verbose
+class CommonAliasDecorator(gdb.FrameDecorator):
+    def __init__(self, fobj):
+        super(CommonAliasDecorator, self).__init__(fobj)
+
+    # rewrite the function name to make it a bit less ugly:
+    def function(self):
+        name = self.inferior_frame().name()
+        if name.startswith("<lambda"):
+            # this starts with an angle bracket but won't have any template parameters
+            return name
+        # rename std::string
+        orig = name
+        name = re.sub('std::__cxx11::basic_string<char>', 'std::string', name)
+        name = re.sub('std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >', 'std::string', name)
+        # turn std::vector<T, std::allocator<T>> into std::vector<T>
+        name = re.sub(r"std::vector<([^<>]*), std::allocator<\1 > >", r"std::vector<\1 >", name)
+        # turn __gnu_cxx::__normal_iterator<T*, std::vector<T > > into std::vector<T>::iterator
+        name = re.sub(r"__gnu_cxx::__normal_iterator<(.*)\*, std::vector<\1 > >", r"std::vector<\1 >::iterator", name)
+        name = re.sub(r"__gnu_cxx::__normal_iterator<(.*)\*, std::vector<\1, std::allocator<\1 > > >", r"std::vector<\1 >::iterator", name)
+
+        return name
 
 # define a stack frame filter
 class UserFilter:
@@ -441,6 +469,8 @@ class UserFilter:
     def filter(self, frame_iter):
         # wrap the current iterator in a squash-matching-subsequences iterator
         # with the predicate "function name matches regex"
-        return UserFilter.__cond_squash(frame_iter, lambda x : re.match(StepUser.stepRegex, x.function()))
+        ufi = UserFilter.__cond_squash(frame_iter, lambda x : re.match(StepUser.stepRegex, x.function()))
+        # further wrap in a decorator and return
+        return imap(CommonAliasDecorator, ufi)
 
 UserFilter()
