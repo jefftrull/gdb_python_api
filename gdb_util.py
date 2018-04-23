@@ -400,7 +400,7 @@ class StepUserIgnoreRegex (gdb.Parameter):
 
     def __init__ (self):
         super (StepUserIgnoreRegex, self).__init__ ("stepu-ignore-regex",
-                                                    gdb.COMMAND_BREAKPOINTS,
+                                                    gdb.COMMAND_RUNNING,
                                                     gdb.PARAM_STRING_NOESCAPE)
         StepUser.stepRegex = '^(std::|__gnu)'   # default
 
@@ -469,8 +469,35 @@ class UserFilter:
     def filter(self, frame_iter):
         # wrap the current iterator in a squash-matching-subsequences iterator
         # with the predicate "function name matches regex"
-        ufi = UserFilter.__cond_squash(frame_iter, lambda x : re.match(StepUser.stepRegex, x.function()))
-        # further wrap in a decorator and return
-        return imap(CommonAliasDecorator, ufi)
+        squash_regex = gdb.parameter('backtrace-strip-regex')
+        if squash_regex:
+            ufi = UserFilter.__cond_squash(frame_iter, lambda x : re.match(squash_regex, x.function()))
+            # further wrap in a decorator and return
+            return imap(CommonAliasDecorator, ufi)
+        else:
+            # just add the decorator to the original iterator
+            return imap(CommonAliasDecorator, frame_iter)
 
 UserFilter()
+
+# Allow users to specify regex used in stepping
+class BacktraceStripRegex (gdb.Parameter):
+    """Regex for function names to skip through in backtrace"""
+
+    set_doc = "set this to consolidate library namespaces etc. in the backtrace"
+    show_doc = "show this to see the currently skipped library namespaces etc."
+
+    def __init__ (self):
+        super (BacktraceStripRegex, self).__init__ ("backtrace-strip-regex",
+                                                    gdb.COMMAND_STACK,
+                                                    gdb.PARAM_STRING_NOESCAPE)
+        self.value = '^(std::|__gnu)'   # default
+
+    # required API
+    def get_set_string(self):
+        return self.value
+
+    def get_show_string(self, svalue):
+        return self.value
+
+BacktraceStripRegex()
