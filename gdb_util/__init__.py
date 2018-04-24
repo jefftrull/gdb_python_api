@@ -30,8 +30,7 @@ except ImportError:
     imap = map
 
 from os import path
-sys.path.append(path.dirname(__file__))   # look in *this* directory for others
-from libclang_helpers import getASTNode, getASTSibling, getFuncName
+from gdb_util.libclang_helpers import getASTNode, getASTSibling, getFuncName
 from clang.cindex import CursorKind
 
 class FramePrinter:
