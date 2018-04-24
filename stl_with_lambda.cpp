@@ -18,9 +18,9 @@ int main() {
     // (broken) attempt at lexicographic sort
 
     std::vector<Strings> data{
-        {{"Foo", "Bar", "Baz"}},
-        {{"Frodo", "Sam", "Smeagol"}},
-        {{"Monoid", "Endofunctor", "Monad"}}};
+        {"Frodo", "Sam", "Smeagol"},
+        {"Foo", "Bar", "Baz"},
+        {"Monoid", "Endofunctor", "Monad"}};
 
     // sample code targets the beginning of this call:
     std::sort(data.begin(), data.end(),
