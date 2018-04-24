@@ -5,9 +5,9 @@ Usage: `PYTHONPATH=/path/to/gdb_python_api gdb ...`
 
 ## Backtrace Cleanup for C++ template libraries
 
-Backtraces from heavily templated library code can be tough for users to understand. Through the use of the [frame filter](https://sourceware.org/gdb/onlinedocs/gdb/Frame-Filter-API.html#Frame-Filter-API) and [frame decorator](https://sourceware.org/gdb/onlinedocs/gdb/Frame-Decorator-API.html#Frame-Decorator-API] APIs we can filter out library internals and display more readable aliases for common types.
+Backtraces from heavily templated library code can be tough for users to understand. Through the use of the [frame filter](https://sourceware.org/gdb/onlinedocs/gdb/Frame-Filter-API.html#Frame-Filter-API) and [frame decorator](https://sourceware.org/gdb/onlinedocs/gdb/Frame-Decorator-API.html#Frame-Decorator-API) APIs we can filter out library internals and display more readable aliases for common types.
 
-When the `backtrace` module is imported, future backtraces are controlled by the `backtrace-strip-regex` parameter. Any sequence of frames with matching function names will be trimmed to just the top one. This has the effect of showing only the *call* into library code, and not the subsequent library internals.
+When the `backtrace` module is imported, future backtraces are controlled by the `backtrace-strip-regex` parameter. Any sequence of frames with matching function names will be trimmed to just the bottom (highest numbered) one. This has the effect of showing only the *call* into library code, and not the subsequent library internals.
 
 In addition, the display of each frame is trimmed by using common type aliases. For example, `std::__cxx11::basic_string<char>` is replaced by `std::string`.
 
@@ -17,15 +17,13 @@ In addition, the display of each frame is trimmed by using common type aliases. 
 (gdb) run
 (gdb) show backtrace-strip-regex
 ^(std::|__gnu)
-~~~
-<step into some function>
-~~~
+step into some function
 (gdb) backtrace
 ~~~
 
 ## Stepping only into user code
 
-Another challenge with using template libraries is in stepping through code execution. Particularly in debug builds, such libraries may make a lot of calls that are hard to understand before reaching any user code. Users can work around this by looking up line numbers and setting breakpoints, but that's tedious.
+Another challenge with using template libraries is in stepping through code execution. Particularly in debug builds, such libraries may make a lot of calls that are hard to understand, before reaching any user code. Users can work around this by looking up line numbers and setting breakpoints, but that's tedious.
 
 The `stepu` command steps only into *user* code, by skipping functions matching the `stepu-ignore-regex` parameter. It examines the AST at the current line using [libClang](https://clang.llvm.org/doxygen/group__CINDEX.html)'s Python API, and advances execution until a user function is hit.
 
@@ -40,9 +38,7 @@ PYTHONPATH=/path/to/gdb_python_api LD_LIBRARY_PATH=/usr/lib/llvm-5.0/lib gdb ...
 ^(std::|__gnu)
 (gdb) b main
 (gdb) run
-~~~
-<step to a std library function call>
-~~~
+step to a std library function call
 (gdb) stepu
 ~~~
 
