@@ -22,8 +22,16 @@
 from clang import cindex
 from os import path
 
-def getASTNode(fname, line, column, compdb_fname = './compile_commands.json'):
-    """Find the enclosing AST node of a given file and line"""
+def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_commands.json'):
+    """Find the enclosing AST node of a given location
+
+    Keyword arguments:
+    fname        -- the file containing the desired node
+    line         -- the line of the node
+    column       -- the column of the node
+    tu_fname     -- the source file containing the compiled translation unit, if different (i.e. if fname was included)
+    compdb_fname -- the file containing the compilation database
+    """
 
     compilation_database_path = path.dirname(compdb_fname)
     index = cindex.Index.create()
