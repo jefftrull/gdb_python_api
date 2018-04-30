@@ -90,7 +90,7 @@ class StepUser (gdb.Command):
         # or the end of the frame, if we are the last
         nextStmt = getASTSibling(parent, node)
         if nextStmt is None:
-            if not gdb.selected_frame() == gdb.newest_frame():
+            if gdb.selected_frame().older() is not None:
                 # create default finish breakpoint
                 StepUser.finishBP = gdb.FinishBreakpoint(internal=True)  # on by default in case no other breakpoints happen
             else:
@@ -261,7 +261,7 @@ class FinishUser (gdb.Command):
             StepUser.finishBP.enabled = True
             gdb.execute("continue")
         else:
-            print('no previous stepu command found')
+            print('no previous stepu command found, or previous stepu was called from outermost frame')
 FinishUser()
 
 # Allow users to specify regex used in stepping
