@@ -43,6 +43,8 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
         raise RuntimeError('Could not load compilation database for %s'%compilation_database_path)
 
     # Step 2: query compilation flags
+    if tu_fname is None:        # indicates file is the translation unit
+        tu_fname = fname
     cmds = compdb.getCompileCommands(tu_fname)
 
     # getCompileCommands signals "not found" with None result
@@ -65,7 +67,9 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
         else:
             args.append(arg)
 
-    translation_unit = index.parse(fname, args)
+    translation_unit = index.parse(tu_fname, args)
+    # TODO: this would be an excellent place to cache the parse results
+    # compilation could take a noticeable amount of time
 
     if (len(translation_unit.diagnostics) > 0):
         print(['%s:%s'%(x.category_name, x.spelling) for x in translation_unit.diagnostics])
@@ -107,3 +111,19 @@ def getFuncName(node):
         nm = '%s::%s'%(node.semantic_parent.spelling, nm)
         node = node.semantic_parent
     return nm
+
+def findFirstTU(files, compdb_fname='./compile_commands.json'):
+    """Return the first file found within the compilation database"""
+
+    compilation_database_path = path.dirname(compdb_fname)
+
+    try:
+        compdb = cindex.CompilationDatabase.fromDirectory(compilation_database_path)
+    except CompilationDatabaseError:
+        raise RuntimeError('Could not load compilation database for %s'%compilation_database_path)
+
+    for fn in files:
+        cmds = compdb.getCompileCommands(fn)
+        if cmds is not None:
+            return fn
+    return None

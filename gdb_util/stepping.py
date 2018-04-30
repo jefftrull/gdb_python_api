@@ -22,7 +22,7 @@
 import gdb
 import re
 
-from gdb_util.libclang_helpers import getASTNode, getASTSibling, getFuncName
+from gdb_util.libclang_helpers import getASTNode, getASTSibling, getFuncName, findFirstTU
 from clang.cindex import CursorKind
 
 # Set breakpoints on "downstream" user code, continue until you reach one, then remove breakpoints
@@ -40,9 +40,22 @@ class StepUser (gdb.Command):
         parent = None
         try:
             # find the AST node closest to the beginning of the current line
-            line = gdb.newest_frame().find_sal().line
-            node = getASTNode(gdb.newest_frame().find_sal().symtab.filename,
-                              line, 1)
+            frame = gdb.selected_frame()
+            line = frame.find_sal().line
+            fname = frame.find_sal().symtab.filename
+            compdb_fname = './compile_commands.json'
+
+            # If the current file is not the base TU (the source that was compiled), find it by looking up the stack
+            # prepare a list of candidates by looking at the stack
+            files = []
+            while frame is not None:
+                files.append(frame.find_sal().symtab.filename)
+                frame = frame.older()
+            tu_fname = findFirstTU(files)
+            if tu_fname is None:
+                raise RuntimeError('cannot find the translation unit for file %s'%fname)
+
+            node = getASTNode(fname, line, 1, tu_fname, compdb_fname)
             # If the location of this node is prior to the current line, it probably represents
             # the parent to our desired node. Find the first child at or after our desired location.
             if node.location.line < line:
