@@ -37,14 +37,17 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
     index = cindex.Index.create()
 
     # Step 1: load the compilation database
-    compdb = cindex.CompilationDatabase.fromDirectory(compilation_database_path)
+    try:
+        compdb = cindex.CompilationDatabase.fromDirectory(compilation_database_path)
+    except cindex.CompilationDatabaseError:
+        raise RuntimeError('Could not load compilation database for %s'%compilation_database_path)
 
     # Step 2: query compilation flags
-    try:
-        cmds = compdb.getCompileCommands(fname)
+    cmds = compdb.getCompileCommands(tu_fname)
 
-    except cindex.CompilationDatabaseError:
-        raise RuntimeError('Could not load compilation flags for %s'%fname)
+    # getCompileCommands signals "not found" with None result
+    if cmds is None:
+        raise RuntimeError('No compilation flags found for %s'%tu_fname)
 
     # assuming only one command is required to build
     cmd = cmds.__getitem__(0)
