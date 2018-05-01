@@ -12,6 +12,10 @@
 #include <iostream>
 #include <iterator>
 
+#include "detail.h"
+
+using namespace detail;
+
 using Strings = std::vector<std::string>;
 
 int main() {
@@ -31,6 +35,9 @@ int main() {
                       return a[1] < b[1];
                   }
               });
+
+    Foo f;
+    do_something(f);
 
     for(auto const & v : data) {
         std::copy(v.begin(), v.end(),
