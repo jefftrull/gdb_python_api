@@ -76,10 +76,10 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
         raise RuntimeError('Failure during libclang parsing')
 
     # we can go from TU's primary cursor to a specific file location with:
-    cur = cindex.Cursor.from_location(translation_unit,
-                                      cindex.SourceLocation.from_position(translation_unit,
-                                                                          translation_unit.get_file(fname),
-                                                                          line, column))
+    loc = cindex.SourceLocation.from_position(translation_unit,
+                                              translation_unit.get_file(fname),
+                                              line, column)
+    cur = cindex.Cursor.from_location(translation_unit, loc)
 
     return cur
 

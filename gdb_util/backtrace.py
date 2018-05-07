@@ -85,7 +85,8 @@ class UserFilter:
         # with the predicate "function name matches regex"
         squash_regex = gdb.parameter('backtrace-strip-regex')
         if squash_regex:
-            ufi = UserFilter.__cond_squash(frame_iter, lambda x : re.match(squash_regex, x.function()))
+            ufi = UserFilter.__cond_squash(frame_iter,
+                                           lambda x : re.match(squash_regex, x.function()))
             # further wrap in a decorator and return
             return imap(CommonAliasDecorator, ufi)
         else:
