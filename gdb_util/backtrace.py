@@ -70,13 +70,18 @@ class UserFilter:
         """wrap iterator to compress subsequences for which a predicate is true, keeping only the *last* of each"""
         last = None              # we have to buffer 1 item
         for item in iterable:
-            if squashfn(item):
-                last = item
+            # item.function() returns address when no debugging symbol was found
+            if item.function() == item.address():
+                last = None
+                yield item;
             else:
-                if last is not None:
-                    yield last   # empty buffer this time
-                    last = None
-                yield item       # resume un-squashed iteration
+                if squashfn(item):
+                    last = item
+                else:
+                    if last is not None:
+                        yield last   # empty buffer this time
+                        last = None
+                    yield item       # resume un-squashed iteration
         if last is not None:
             yield last           # in case we end in "squashed" mode
 
