@@ -21,6 +21,17 @@ step into some function
 (gdb) backtrace
 ~~~
 
+### Compressing Related Frames
+`backtrace-strip-regex` combines all consecutive frames that match it. You can also separately combine groups using `backtrace-strip-regexes`:
+
+~~~
+(gdb) set backtrace-strip-regexes (^std::)|(^boost::)
+~~~
+
+Now a backtrace from the `std::` namespace followed immediately by frames from the `boost::` namespace will display the last frame from each. Parentheses are used to identify separate groups. If your regex requires subgroups, use a *non-capturing* group starting with `(?:`.
+
+`backtrace-strip-regexes` overrides `backtrace-strip-regex`.
+
 ## Stepping only into user code
 
 Another challenge with using template libraries is in stepping through code execution. Particularly in debug builds, such libraries may make a lot of calls that are hard to understand, before reaching any user code. Users can work around this by looking up line numbers and setting breakpoints, but that's tedious.
