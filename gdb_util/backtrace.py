@@ -86,7 +86,7 @@ class UserFilter:
         squash_regex = gdb.parameter('backtrace-strip-regex')
         if squash_regex:
             ufi = UserFilter.__cond_squash(frame_iter,
-                                           lambda x : re.match(squash_regex, x.function()))
+                                           lambda x : (x.function() != x.address()) and re.match(squash_regex, x.function()))
             # further wrap in a decorator and return
             return imap(CommonAliasDecorator, ufi)
         else:
