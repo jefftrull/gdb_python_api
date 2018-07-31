@@ -23,10 +23,11 @@ endif()
 #
 
 # stack dump demonstration code
-add_executable( ll lotsa_locals.cpp )
+add_executable( ll examples/lotsa_locals.cpp )
 
 # navigation in templated code demo
-add_executable( swl stl_with_lambda.cpp )
+add_executable( swl examples/stl_with_lambda.cpp )
+target_compile_options( swl PRIVATE -std=c++17 )
 
 #
 # libClang stuff
@@ -68,7 +69,7 @@ else()
   target_link_libraries( le PUBLIC ${CLANG_LIB_DIR}/libclang.so )
 endif()
 
-target_link_libraries( le PRIVATE Boost::boost )
+target_link_libraries( le PRIVATE Boost::boost -lstdc++fs )
 
 # some "tests" that just exercise the libClang users enough to show they are working
 # (and to provide usage examples)

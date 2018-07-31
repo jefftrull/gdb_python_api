@@ -23,6 +23,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <experimental/filesystem>
 
 #include <boost/preprocessor/stringize.hpp>
 
@@ -79,14 +80,19 @@ private:
 };
 
 int main() {
+    namespace fs = std::experimental::filesystem;
+
     CXCompilationDatabase_Error err;
-    CXCompilationDatabase cdb = clang_CompilationDatabase_fromDirectory("/home/jet/oss/gdb_python_api/build", &err);
+    CXCompilationDatabase cdb = clang_CompilationDatabase_fromDirectory(".", &err);
     if (err) {
         std::cerr << "failed to load compilation database\n";
         exit(1);
     }
-    char const * ourfn = "/home/jet/oss/gdb_python_api/stl_with_lambda.cpp";
-    CXCompileCommands cmds = clang_CompilationDatabase_getCompileCommands(cdb, ourfn);
+    // get absolute path to source file
+    auto ourpath = fs::path("../examples/stl_with_lambda.cpp");
+    auto abspath = fs::absolute(ourpath);
+    std::string ourfn = abspath.string();
+    CXCompileCommands cmds = clang_CompilationDatabase_getCompileCommands(cdb, ourfn.c_str());
     // fill out the array of char ptrs clang_parseTranslationUnit wants to see
     CXCompileCommand cmd = clang_CompileCommands_getCommand(cmds, 0);   // assuming there is only one
     std::vector<const char *> cmdstrs;
@@ -97,6 +103,7 @@ int main() {
 #endif
 
     for (unsigned cmdno = 1; cmdno < clang_CompileCommand_getNumArgs(cmd); ++cmdno) {
+        std::cerr << clang_getCString(clang_CompileCommand_getArg(cmd, cmdno)) << ", ";
         if (std::string(clang_getCString(clang_CompileCommand_getArg(cmd, cmdno))) == "-c") {
             // skip input filename
             ++cmdno;
@@ -107,10 +114,11 @@ int main() {
             cmdstrs.push_back(clang_getCString(clang_CompileCommand_getArg(cmd, cmdno)));
         }
     }
+    std::cerr << "\n";
 
     CXIndex index = clang_createIndex(0, 1);
     CXTranslationUnit tu;
-    CXErrorCode errc = clang_parseTranslationUnit2(index, ourfn,
+    CXErrorCode errc = clang_parseTranslationUnit2(index, ourfn.c_str(),
                                                    cmdstrs.data(),
                                                    cmdstrs.size(),
                                                    nullptr, 0,
@@ -127,7 +135,7 @@ int main() {
         exit(1);
     }
 
-    CXSourceLocation startloc = clang_getLocation(tu, clang_getFile(tu, ourfn), 26, 1);
+    CXSourceLocation startloc = clang_getLocation(tu, clang_getFile(tu, ourfn.c_str()), 26, 1);
     CXCursor cur = clang_getCursor(tu, startloc);
     // If we want to do the whole file
     // CXCursor cur = clang_getTranslationUnitCursor(tu);
