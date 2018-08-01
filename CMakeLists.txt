@@ -29,6 +29,9 @@ add_executable( ll examples/lotsa_locals.cpp )
 add_executable( swl examples/stl_with_lambda.cpp )
 target_compile_options( swl PRIVATE -std=c++17 )
 
+# code with a leak
+add_executable( leak examples/leaker.cpp )
+
 #
 # libClang stuff
 #
