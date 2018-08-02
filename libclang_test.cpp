@@ -48,7 +48,7 @@ struct PrintingVisitor {
 
     static CXChildVisitResult
     visit(CXCursor cursor,
-          CXCursor parent,
+          CXCursor /* parent */,
           CXClientData data) {
         // rebind "this" from c-style client data
         auto visitor = reinterpret_cast<PrintingVisitor*>(data);

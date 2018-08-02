@@ -20,7 +20,7 @@ struct Person : std::enable_shared_from_this<Person> {
 
 private:
     Person(std::string name, std::shared_ptr<Person> parent)
-        : name_(std::move(name)), parent_(std::move(parent)) {}
+        : parent_(std::move(parent)), name_(std::move(name)) {}
 
     std::shared_ptr<Person>              parent_;
     std::vector<std::shared_ptr<Person>> children_;

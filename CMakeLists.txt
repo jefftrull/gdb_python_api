@@ -10,6 +10,8 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 # always use -fno-omit-frame-pointer because stack printing won't work otherwise ATM
 add_compile_options( "-fno-omit-frame-pointer" )
 
+set( CMAKE_CXX_FLAGS "-Wall -Wextra -Werror" )
+
 # for relaxing debug, make it:
 set( CMAKE_CXX_FLAGS_DEBUG "-g -Og" )
 

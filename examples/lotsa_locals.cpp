@@ -30,8 +30,14 @@ void work(int j, std::string const& s) {
     // one arg, one local
     bar.push_back(s);
 
+    // suppress unused warning
+    (void)j;
+
 }
 
 int main(int argc, char **argv) {
     work(1, "quux");
+
+    (void)argc;
+    (void)argv;
 }
