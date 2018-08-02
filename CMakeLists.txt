@@ -34,6 +34,9 @@ target_compile_options( swl PRIVATE -std=c++17 )
 # code with a leak
 add_executable( leak examples/leaker.cpp )
 
+# using std::sort
+add_executable( srs examples/sort_random_sequence.cpp )
+
 #
 # libClang stuff
 #
