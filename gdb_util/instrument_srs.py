@@ -68,6 +68,16 @@ class GuiThread(Thread):
             if op is 'swap':
                 # actually seems to understand the size of the elements:
                 print('got command to swap offsets %s and %s'%(a, b))
+                elt_a = self.elements[a]
+                elt_b = self.elements[b]
+                # update positions
+                pos_a = elt_a.pos()
+                pos_b = elt_b.pos()
+                self.elements[b].setPos(pos_a)
+                self.elements[a].setPos(pos_b)
+                # update elements list
+                self.elements[a] = elt_b
+                self.elements[b] = elt_a
             else:
                 print('got move command from %s to %s'%(a, b))
 
