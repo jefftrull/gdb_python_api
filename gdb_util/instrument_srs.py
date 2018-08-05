@@ -68,24 +68,34 @@ class GuiThread(Thread):
             if op is 'swap':
                 # actually seems to understand the size of the elements:
                 print('got command to swap offsets %s and %s'%(a, b))
-                elt_a = self.elements[a]
-                elt_b = self.elements[b]
-                # update positions
-                pos_a = elt_a.pos()
-                pos_b = elt_b.pos()
-                self.elements[b].setPos(pos_a)
-                self.elements[a].setPos(pos_b)
-                # update elements list
-                self.elements[a] = elt_b
-                self.elements[b] = elt_a
+                self._perform_swap(a, b)
+            elif op is 'move':
+                print('got regular move cmd from %s to %s'%(a, b))
+                # swap src and dst, then mark src "moved from"
+                self._perform_swap(a, b)
+                self.elements[a].setMovedFrom()
+                self.elements[b].setMovedFrom(False)
             else:
                 print('got move command from %s to %s'%(a, b))
+
+    def _perform_swap(self, a, b):
+        elt_a = self.elements[a]
+        elt_b = self.elements[b]
+        # update positions
+        pos_a = elt_a.pos()
+        pos_b = elt_b.pos()
+        self.elements[b].setPos(pos_a)
+        self.elements[a].setPos(pos_b)
+        # update elements list
+        self.elements[a] = elt_b
+        self.elements[b] = elt_a
 
     def run(self):
         # putting the PyQt imports here avoids the "main thread" warning
         # it seems that merely importing the PyQt modules causes QObject accesses
         from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem
         from PyQt5.QtCore import Qt, QTimer
+        from PyQt5.QtGui  import QColor
 
         # and that includes class definitions too :-/
         class Element(QGraphicsRectItem):
@@ -94,10 +104,18 @@ class GuiThread(Thread):
                 self.value = value
                 self.setRect(0, 0, 20, 20)
                 self.setPos(20+20*idx, 20)
+                self.movedFrom = False
+
+            def setMovedFrom(self, mf = True):
+                self.movedFrom = mf
+                self.update()
 
             def paint(self, painter, options, widget):
                 super(Element, self).paint(painter, options, widget)
-                painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
+                if self.movedFrom:
+                    painter.fillRect(self.rect(), QColor('grey'))
+                else:
+                    painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
 
         self.app = QApplication([])
 
