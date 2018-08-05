@@ -130,66 +130,48 @@ sort_bp.silent = True
 
 # next prepare to enable and execute the swap display commands
 
-# breakpoint's commands property was made writable too recently for me to use:
-# https://sourceware.org/bugzilla/show_bug.cgi?id=22731
-# instead we have to write out a script to a tempfile... groan...
-tf = tempfile.NamedTemporaryFile(mode='w', delete=False)
+# The code below requires gdb 8.1.1 which enabled writable commands for breakpoints
 
 # actions for when we arrive at std::sort
 # TODO is there a way to improve this formatting?
-tf.write(("commands %d\n"
-          # a breakpoint at the end of std::sort, for cleanup and to keep our process alive
-          "py finish_bp = gdb.FinishBreakpoint()\n"
-          # move up to the main() frame to accessvariables
-          "py gdb.selected_frame().older().select()\n"
-          # tell our gui thread about the container being sorted
-          # new gdb 8.1.1 does not seem to understand the operator[], though 8.1.0 did
-#          "py gdb_util.instrument_srs.gui = gdb_util.instrument_srs.GuiThread(gdb.parse_and_eval('&A[0]'), gdb.parse_and_eval('A.size()'))\n"
-          "py gdb_util.instrument_srs.gui = gdb_util.instrument_srs.GuiThread(gdb.parse_and_eval('A._M_impl._M_start'), gdb.parse_and_eval('A._M_impl._M_finish - A._M_impl._M_start'))\n"
-          # launch gui
-          "py gdb_util.instrument_srs.gui.start()\n"
-          # turn on observability breakpoints
-          "enable %d\n"
-          "enable %d\n"
-          "enable %d\n"
-          # run the algorithm
-          "c\n"
-          "end\n")%(sort_bp.number, swap_bp.number, move_bp.number, move_assign_bp.number))
+sort_bp.commands = (
+    # a breakpoint at the end of std::sort, for cleanup and to keep our process alive
+    "py finish_bp = gdb.FinishBreakpoint()\n"
+    # move up to the main() frame to accessvariables
+    "py gdb.selected_frame().older().select()\n"
+    # tell our gui thread about the container being sorted
+    # new gdb 8.1.1 does not seem to understand the operator[], though 8.1.0 did
+    # "py gdb_util.instrument_srs.gui = gdb_util.instrument_srs.GuiThread(gdb.parse_and_eval('&A[0]'), gdb.parse_and_eval('A.size()'))\n"
+    "py gdb_util.instrument_srs.gui = gdb_util.instrument_srs.GuiThread(gdb.parse_and_eval('A._M_impl._M_start'), gdb.parse_and_eval('A._M_impl._M_finish - A._M_impl._M_start'))\n"
+    # launch gui
+    "py gdb_util.instrument_srs.gui.start()\n"
+    # turn on observability breakpoints
+    "enable %d\n"
+    "enable %d\n"
+    "enable %d\n"
+    # run the algorithm
+    "c\n"
+    "end\n")%(swap_bp.number, move_bp.number, move_assign_bp.number)
 
 # actions for each swap()
-tf.write(("commands %d\n"
-          "py gdb_util.instrument_srs.gui.show_swap(gdb.selected_frame().read_var('a'), gdb.selected_frame().read_var('b'))\n"
-          "py gdb_util.instrument_srs.skip_through_swap(%d, %d)\n"
-          # resume
-          "c\n"
-          "end\n")%(swap_bp.number, move_bp.number, move_assign_bp.number))
+swap_bp.commands = (
+    "py gdb_util.instrument_srs.gui.show_swap(gdb.selected_frame().read_var('a'), gdb.selected_frame().read_var('b'))\n"
+    # now pass through the actual swap execution while ignoring any moves
+    "disable %d\n"
+    "disable %d\n"
+    "py fbp = gdb.FinishBreakpoint(internal=True)\n"
+    "py fbp.silent = True\n"
+    "py fbp.commands = 'enable %d\\nenable %d\\nc\\n'\n"
+    # resume
+    "c\n"
+    "end\n")%(move_bp.number, move_assign_bp.number, move_bp.number, move_assign_bp.number)
 
 # actions for move (either construct or assign)
 # Weird observation: these run without having to hit return at the prompt... can this lead to a workaround?
-move_actions = ("commands %d\n"
-                "py gdb_util.instrument_srs.gui.show_move(gdb.selected_frame().read_var('this'), gdb.selected_frame().read_var('other'))\n"
-                "c\n"
-                "end\n")
-tf.write(move_actions%move_bp.number)
-tf.write(move_actions%move_assign_bp.number)
+move_commands = (
+    "py gdb_util.instrument_srs.gui.show_move(gdb.selected_frame().read_var('this'), gdb.selected_frame().read_var('other'))\n"
+    "c\n"
+    "end\n")
+move_bp.commands = move_commands
+move_assign_bp.commands = move_commands
 
-tf.flush()
-tf.close()
-gdb.execute('source %s'%tf.name)
-os.unlink(tf.name)
-
-def skip_through_swap(mbp1, mbp2):
-    # disable the move breakpoints (they will otherwise trigger during the swap)
-    bps = gdb.breakpoints()
-    bp1 = bps[mbp1-1]
-    bp2 = bps[mbp2-1]
-    bp1.enabled = False
-    bp2.enabled = False
-    # run to the end of swap
-    fbp = gdb.FinishBreakpoint(internal = True)
-    fbp.silent = True
-    gdb.execute('c')
-    # restore
-    bp1.enabled = True
-    bp2.enabled = True
-    gdb.execute('continue')

@@ -41,7 +41,6 @@ int_wrapper_t& int_wrapper_t::operator=(int_wrapper_t && other)
 void swap(int_wrapper_t & a, int_wrapper_t & b)
 {
     // we will hook this function to find out what's going on
-    // BOZO but std::swap will call other stuff we are observing... oops
     std::swap(a, b);
 
 }
