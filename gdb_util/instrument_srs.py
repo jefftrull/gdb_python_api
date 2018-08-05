@@ -69,6 +69,8 @@ class GuiThread(Thread):
     # Only standard Python types cross the barrier
 
     def _check_for_messages(self):
+        from PyQt5.QtCore  import QPointF
+
         # poll command queue
         # not ideal but safe. OK for now.
         if not self.messages.empty():
@@ -79,29 +81,27 @@ class GuiThread(Thread):
                 self._perform_swap(a, b)
             elif op is 'move':
                 print('got regular move cmd from %s to %s'%(a, b))
-                # swap src and dst, then mark src "moved from"
-                self._perform_swap(a, b)
-                self.elements[a].setMovedFrom()
-                self.elements[b].setMovedFrom(False)
+                self.elements[b] = self.elements[a]
+                self.elements[a] = None
+                self.elements[b].setPos(QPointF(20+20*b, 20))
             elif op is 'move_from_temp':
                 print('moving from temp %s to offset %d'%(a, b))
                 # temporary elements indexed by address, as a string
-                temp_elt = self.temp_elements[a]
-                temp_elt.setVisible(False)
-                self.elements[b].setMovedFrom(False)
-                self.elements[b].value = temp_elt.value
+                (pos, temp_elt) = self.temp_elements[a]
+                self.temp_elements[a] = (pos, None)
+                temp_elt.setPos(QPointF(20+20*b, 20))
+                self.elements[b] = temp_elt
             elif op is 'move_to_temp':
                 print('moving from offset %d to temp %s'%(a, b))
                 # see if we know of this temp element
                 if b in self.temp_elements:
-                    temp_elt = self.temp_elements[b]
-                    temp_elt.value = self.elements[a].value
+                    # we already saw this address. reuse its position.
+                    (pos, temp_elt) = self.temp_elements[b]
                 else:
-                    temp_elt = self.make_temp_elt(len(self.temp_elements), self.elements[a].value)
-                    self.temp_elements[b] = temp_elt
-                    self.scene.addItem(temp_elt)
-                self.elements[a].setMovedFrom(True)
-                temp_elt.setVisible(True)
+                    pos = QPointF(20+20*len(self.temp_elements), 60)
+                self.elements[a].setPos(pos)
+                self.temp_elements[b] = (pos, self.elements[a])
+                self.elements[a] = None
             else:
                 print('unknown move command from %s to %s'%(a, b))
 
@@ -122,7 +122,7 @@ class GuiThread(Thread):
         # it seems that merely importing the PyQt modules causes QObject accesses
         from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem
         from PyQt5.QtCore import Qt, QTimer
-        from PyQt5.QtGui  import QColor
+        from PyQt5.QtGui  import QColor, QBrush, QPen
 
         # and that includes class definitions too :-/
         class Element(QGraphicsRectItem):
@@ -131,34 +131,21 @@ class GuiThread(Thread):
                 self.value = value
                 self.setRect(0, 0, 20, 20)
                 self.setPos(20+20*idx, 20)
-                self.movedFrom = False
-
-            def setMovedFrom(self, mf = True):
-                self.movedFrom = mf
-                self.update()
 
             def paint(self, painter, options, widget):
                 super(Element, self).paint(painter, options, widget)
-                if self.movedFrom:
-                    painter.fillRect(self.rect(), QColor('grey'))
-                else:
-                    painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
-
-        class TempElement(Element):
-            def __init__(self, idx, value):
-                super(Element, self).__init__()
-                self.value = value
-                self.setRect(0, 0, 20, 20)
-                self.setPos(20+20*idx, 60)
-                self.movedFrom = False
-
-        # give message service code ability to create temp elements
-        self.make_temp_elt = lambda idx, value : TempElement(idx, value)
+                painter.fillRect(self.rect(), QColor('white'))
+                painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
+                painter.drawRect(self.rect())
 
         self.app = QApplication([])
 
-        # create view of sequence
         self.scene = QGraphicsScene()
+
+        # a gray background rectangle to reveal for "moved from" elements
+        self.scene.addRect(20, 20, 20*len(self.values), 20, QPen(), QColor('grey'))
+
+        # then the elements themselves
         idx = 0   # or zip with index
         self.elements = []
         for v in self.values:
@@ -167,6 +154,7 @@ class GuiThread(Thread):
             self.scene.addItem(elt)
             idx = idx + 1
 
+        # positions for temp elements
         self.temp_elements = {}
 
         self.view = QGraphicsView()
