@@ -19,7 +19,11 @@ class GuiThread(Thread):
         for idx in range(0, size):
             self.values.append(int((base_addr + idx).dereference().cast(int_t)))
 
-    # next, updates for instrumented actions
+    # Front end code
+    # These methods run in the gdb thread in response to breakpoints,
+    # and accept gdb.Value objects
+
+    # Updates for instrumented actions
     def show_swap(self, a, b):
         # sending gdb.Value objects over the queue doesn't seem to work
         # at least, their addresses are no longer accessible in the other thread
@@ -35,7 +39,6 @@ class GuiThread(Thread):
         # detect whether a or b is a temporary
         a_in_vec = (a >= self.base_addr) and (a < (self.base_addr + self.size))
         b_in_vec = (b.address >= self.base_addr) and (b.address < (self.base_addr + self.size))
-        # print('a address = %s, b address = %s, base is %s, size is %s'%(a.address, b.address, self.base_addr, self.size))
 
         # we will supply temporaries as their address in string form,
         # and in-vector quantities as their offset (a Python int)
@@ -44,7 +47,7 @@ class GuiThread(Thread):
         if a_in_vec and b_in_vec:
             a_idx = a - self.base_addr
             b_idx = b.address - self.base_addr
-            self._send_message('move', int(a_idx), int(b_idx))
+            self._send_message('move', int(b_idx), int(a_idx))
         elif a_in_vec:
             # source is a temporary; stringify its address to use as a token representing it
             a_idx = a - self.base_addr
@@ -59,6 +62,11 @@ class GuiThread(Thread):
 
     def _send_message(self, tp, src, dst):
         self.messages.put((tp, src, dst))   # contents are swap info
+
+    # And now the back end.
+    # These run in the GUI thread, taking commands and updating the display.
+    # They use Qt objects and do *not* use gdb stuff
+    # Only standard Python types cross the barrier
 
     def _check_for_messages(self):
         # poll command queue
@@ -75,8 +83,27 @@ class GuiThread(Thread):
                 self._perform_swap(a, b)
                 self.elements[a].setMovedFrom()
                 self.elements[b].setMovedFrom(False)
+            elif op is 'move_from_temp':
+                print('moving from temp %s to offset %d'%(a, b))
+                # temporary elements indexed by address, as a string
+                temp_elt = self.temp_elements[a]
+                temp_elt.setVisible(False)
+                self.elements[b].setMovedFrom(False)
+                self.elements[b].value = temp_elt.value
+            elif op is 'move_to_temp':
+                print('moving from offset %d to temp %s'%(a, b))
+                # see if we know of this temp element
+                if b in self.temp_elements:
+                    temp_elt = self.temp_elements[b]
+                    temp_elt.value = self.elements[a].value
+                else:
+                    temp_elt = self.make_temp_elt(len(self.temp_elements), self.elements[a].value)
+                    self.temp_elements[b] = temp_elt
+                    self.scene.addItem(temp_elt)
+                self.elements[a].setMovedFrom(True)
+                temp_elt.setVisible(True)
             else:
-                print('got move command from %s to %s'%(a, b))
+                print('unknown move command from %s to %s'%(a, b))
 
     def _perform_swap(self, a, b):
         elt_a = self.elements[a]
@@ -117,18 +144,30 @@ class GuiThread(Thread):
                 else:
                     painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
 
+        class TempElement(Element):
+            def __init__(self, idx, value):
+                super(Element, self).__init__()
+                self.value = value
+                self.setRect(0, 0, 20, 20)
+                self.setPos(20+20*idx, 60)
+                self.movedFrom = False
+
+        # give message service code ability to create temp elements
+        self.make_temp_elt = lambda idx, value : TempElement(idx, value)
+
         self.app = QApplication([])
 
         # create view of sequence
         self.scene = QGraphicsScene()
         idx = 0   # or zip with index
         self.elements = []
-        print('spitting out elements')
         for v in self.values:
             elt = Element(idx, v)
             self.elements.append(elt)
             self.scene.addItem(elt)
             idx = idx + 1
+
+        self.temp_elements = {}
 
         self.view = QGraphicsView()
         self.view.setScene(self.scene)
