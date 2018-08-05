@@ -7,23 +7,6 @@ import os
 from threading import Thread
 from queue import Queue
 
-# animated display of operation
-from PyQt5.QtWidgets import QWidget, QApplication, QMainWindow
-from PyQt5.QtCore import Qt, QTimer
-
-class SwapAnimation(QMainWindow):
-    def __init__(self):
-        super(self.__class__, self).__init__()
-
-        self.setStyleSheet('background-color: yellow')
-        self.timer = QTimer()
-        self.timer.timeout.connect(self._timeout)
-        self.timer.start(1000)
-
-    def _timeout(self):
-        self.setStyleSheet('background-color: brown')
-
-
 class GuiThread(Thread):
     def __init__(self, base_addr, size):
         Thread.__init__(self)
@@ -89,6 +72,11 @@ class GuiThread(Thread):
                 print('got move command from %s to %s'%(a, b))
 
     def run(self):
+        # putting the PyQt imports here avoids the "main thread" warning
+        # it seems that merely importing the PyQt modules causes QObject accesses
+        from PyQt5.QtWidgets import QWidget, QApplication, QMainWindow
+        from PyQt5.QtCore import Qt, QTimer
+
         # a warning message about not being run in the main thread gets printed
         # everything I can find suggests this is not a real issue, so long as
         # all QObject access happens in the same thread, which it is.
@@ -99,7 +87,7 @@ class GuiThread(Thread):
         self.cmd_poll_timer.timeout.connect(self._check_for_messages)
         self.cmd_poll_timer.start(100)   # 100ms doesn't seem too terrible *shrug*
 
-        self.top = SwapAnimation()
+        self.top = QMainWindow()
         self.top.show()
         self.app.exec_()
 
@@ -161,13 +149,14 @@ swap_bp.commands = (
     "disable %d\n"
     "py fbp = gdb.FinishBreakpoint(internal=True)\n"
     "py fbp.silent = True\n"
+    # re-enable moves at the finish breakpoint
+    # (we will not execute any commands after our own continue, per gdb manual)
     "py fbp.commands = 'enable %d\\nenable %d\\nc\\n'\n"
     # resume
     "c\n"
     "end\n")%(move_bp.number, move_assign_bp.number, move_bp.number, move_assign_bp.number)
 
 # actions for move (either construct or assign)
-# Weird observation: these run without having to hit return at the prompt... can this lead to a workaround?
 move_commands = (
     "py gdb_util.instrument_srs.gui.show_move(gdb.selected_frame().read_var('this'), gdb.selected_frame().read_var('other'))\n"
     "c\n"
