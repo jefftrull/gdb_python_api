@@ -13,11 +13,11 @@ class GuiThread(Thread):
         self.base_addr = base_addr  # the vector we are monitoring
         self.size = size            # its size
         self.messages = Queue()     # cross-thread communication
-        # debug print contents of vec
+        # store contents of vec
+        self.values = []
         int_t = gdb.lookup_type('int')
         for idx in range(0, size):
-            print('idx %d value %d'%(idx, (base_addr + idx).dereference().cast(int_t)))
-
+            self.values.append(int((base_addr + idx).dereference().cast(int_t)))
 
     # next, updates for instrumented actions
     def show_swap(self, a, b):
@@ -74,21 +74,43 @@ class GuiThread(Thread):
     def run(self):
         # putting the PyQt imports here avoids the "main thread" warning
         # it seems that merely importing the PyQt modules causes QObject accesses
-        from PyQt5.QtWidgets import QWidget, QApplication, QMainWindow
+        from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem
         from PyQt5.QtCore import Qt, QTimer
 
-        # a warning message about not being run in the main thread gets printed
-        # everything I can find suggests this is not a real issue, so long as
-        # all QObject access happens in the same thread, which it is.
+        # and that includes class definitions too :-/
+        class Element(QGraphicsRectItem):
+            def __init__(self, idx, value):
+                super(Element, self).__init__()
+                self.value = value
+                self.setRect(0, 0, 20, 20)
+                self.setPos(20+20*idx, 20)
+
+            def paint(self, painter, options, widget):
+                super(Element, self).paint(painter, options, widget)
+                painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
+
         self.app = QApplication([])
+
+        # create view of sequence
+        self.scene = QGraphicsScene()
+        idx = 0   # or zip with index
+        self.elements = []
+        print('spitting out elements')
+        for v in self.values:
+            elt = Element(idx, v)
+            self.elements.append(elt)
+            self.scene.addItem(elt)
+            idx = idx + 1
+
+        self.view = QGraphicsView()
+        self.view.setScene(self.scene)
+        self.view.show()
 
         # periodically poll command queue
         self.cmd_poll_timer = QTimer()
         self.cmd_poll_timer.timeout.connect(self._check_for_messages)
         self.cmd_poll_timer.start(100)   # 100ms doesn't seem too terrible *shrug*
 
-        self.top = QMainWindow()
-        self.top.show()
         self.app.exec_()
 
 
