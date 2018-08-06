@@ -8,32 +8,37 @@
 
 struct Person : std::enable_shared_from_this<Person> {
     Person(std::string name) : name_(std::move(name)) {}
-    std::shared_ptr<Person> parent() { return parent_; }
+    std::shared_ptr<Person> manager() { return manager_; }
 
-    std::shared_ptr<Person> create_child(std::string name) {
+    std::shared_ptr<Person> create_employee(std::string name) {
         // can't use make_shared because it cannot access the private ctor :(
-        auto child = std::shared_ptr<Person>(new Person(std::move(name), shared_from_this()));
-        children_.push_back(child);
-        return child;
+        auto employee = std::shared_ptr<Person>(new Person(std::move(name), shared_from_this()));
+        employees_.push_back(employee);
+        return employee;
     }
     std::string name() const { return name_; }
 
 private:
-    Person(std::string name, std::shared_ptr<Person> parent)
-        : parent_(std::move(parent)), name_(std::move(name)) {}
+    Person(std::string name, std::shared_ptr<Person> manager)
+        : manager_(std::move(manager)), name_(std::move(name)) {}
 
-    std::shared_ptr<Person>              parent_;
-    std::vector<std::shared_ptr<Person>> children_;
+    std::shared_ptr<Person>              manager_;
+    std::vector<std::shared_ptr<Person>> employees_;
     std::string                          name_;
 };
 
-int main() {
-    {
-        auto alice = std::make_shared<Person>("Alice");
-        auto bob   = alice->create_child("Bob");
-        auto carol = alice->create_child("Carol");
+void foo() {
+  auto alice = std::make_shared<Person>("Alice");
+  auto bob = alice->create_employee("Bob");
+  auto carol = alice->create_employee("Carol");
 
-    }
-    auto david = std::make_shared<Person>("David");
+  std::cout << "three colleagues: " << alice->name() << ", " << bob->name() << ", and " << carol->name() << "\n";
+}   // alice and either one of her employees form a reference loop, so this leaks here
+
+int main() {
+    foo();
+    std::cout << "done with foo\n";
+    auto david = std::make_shared<Person>("David");  // valgrind recognizes leak in here
+    std::cout << "david's name is " << david->name() << "\n";
 }
 
