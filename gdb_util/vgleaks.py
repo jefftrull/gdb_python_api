@@ -21,14 +21,15 @@
 
 import gdb
 import re
-
+from gdb_util.leak_dfs import PointerGraph, LoopFindVisitor
+from graph_tool.search import dfs_search, StopSearch
 
 # single step until Valgrind reports a leak (sloooowwww)
 class StepToLeak(gdb.Command):
     """Step until valgrind reports a leak"""
 
     def __init__ (self):
-        super (StepToLeak, self).__init__ ("stepl", gdb.COMMAND_BREAKPOINTS)
+        super (StepToLeak, self).__init__ ("stepl", gdb.COMMAND_RUNNING)
 
     def invoke(self, arg, from_tty):
         result = gdb.execute('mo leak full', False, True)
@@ -50,13 +51,14 @@ class PrintRefLoop(gdb.Command):
     """Find a reference loop in the leak report"""
 
     def __init__ (self):
-        super (PrintRefLoop, self).__init__ ("frl", gdb.COMMAND_BREAKPOINTS)   # BOZO what is right category?
+        super (PrintRefLoop, self).__init__ ("prl", gdb.COMMAND_DATA)
 
     @staticmethod
     def _get_pointers(block_addr):
         """For a given address, find all pointers to it from other blocks
 
-        Returns a dict of addresses (hex strings) to backtraces, for each allocation
+        Returns a dict of addresses (hex strings) to backtraces and internal
+        pointers, for each allocation
         """
 
         wpatxt = gdb.execute('monitor who_points_at %s'%block_addr, to_string = True)
@@ -82,9 +84,53 @@ class PrintRefLoop(gdb.Command):
                 while wpaln is not None and trace_re.search(wpaln):
                     trace += wpaln + '\n'
                     wpaln = next(wpait, None)
-                result[ptr] = trace
+                result[base] = trace   # TODO also store addresses
             wpaln = next(wpait, None)
         return result
+
+    # utility functions for the DFS
+
+    # we are doing an "implicit" graph here, i.e., we do not know all the vertices (blocks)
+    # in advance. Accordingly our Visitor needs a function to insert the neighbors of any
+    # newly arrived at vertices so the search can proceed.
+    # This serves that role by asking Valgrind for all blocks with pointers to us
+
+    @staticmethod
+    def expand_vertex(g, u):
+        addr = g.vaddr_pmap[u]
+        ptr_dict = PrintRefLoop._get_pointers(addr)
+        for ptr in ptr_dict:
+            if ptr not in g.addr2v:
+                e = g.create_ptr_edge(ptr, u)
+                g.backtraces[e.target()] = ptr_dict[ptr]
+            else:
+                # only add the edge
+                g.add_edge(u, g.addr2v[ptr])
+
+    # Action to take when we find a back edge to the starting point
+    # We print out the block addresses and optional the backtraces of the allocation
+
+    @staticmethod
+    def report_backedge(g, e, pred):
+        print('Pointer loop detected:')
+        # e is the final edge that completes the loop
+        # we want to display the previous edges, in order, followed by e
+        # the predecessor map gives them to us in reverse
+        path = [int(e.target()), int(e.source())]   # reversed path by vertex index
+        v = int(e.source())
+        while v is not int(e.target()):
+            v = pred[v]
+            path.append(v)
+        # now print "path" by edge, reversed, followed by the final edge
+        # zip (reversed) path with itself, offset, to get pairs of vertices
+        # see "pairwise" recipe in itertools docs
+        sources = reversed(path)
+        targets = reversed(path)
+        next(targets, None)     # shift targets by one so edges line up
+        for u, v in zip(sources, targets):
+            print('block %s has pointers to block %s'%(g.vaddr_pmap[u], g.vaddr_pmap[v]))
+        # terminate loop search
+        raise StopSearch()
 
     def invoke(self, arg, from_tty):
         leak_rpt = gdb.execute('monitor leak_check full any', to_string = True)
@@ -104,12 +150,11 @@ class PrintRefLoop(gdb.Command):
         # key part is the single indentation - the first entry:
         blre = re.compile('=+[0-9]+=+ (0x[0-9A-F]+)\[')
         m = blre.search(bl_rpt)
-        wpa_dict = PrintRefLoop._get_pointers(m.group(1))
 
-        for addr, bt in wpa_dict.items():   # "viewitems" in Python 2.7
-            print('for address %s we have the following backtrace:'%addr)
-            print(bt)
-
-        # commence DFS based on that vertex and edges
+        g = PointerGraph(m.group(1))
+        g.backtraces = g.new_vertex_property('string')
+        pred = g.new_vertex_property('int64_t')
+        vis = LoopFindVisitor(g, pred, PrintRefLoop.expand_vertex, PrintRefLoop.report_backedge)
+        dfs_search(g, g.root, vis)
 
 PrintRefLoop()
