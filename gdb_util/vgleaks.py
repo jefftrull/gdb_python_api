@@ -113,6 +113,8 @@ class PrintPtrLoop(gdb.Command):
     @staticmethod
     def report_backedge(g, e, pred):
         print('Pointer loop detected:')
+        print_backtrace = gdb.parameter('ppl-backtrace')
+
         # e is the final edge that completes the loop
         # we want to display the previous edges, in order, followed by e
         # the predecessor map gives them to us in reverse
@@ -129,6 +131,8 @@ class PrintPtrLoop(gdb.Command):
         next(targets, None)     # shift targets by one so edges line up
         for u, v in zip(sources, targets):
             print('block %s has pointers to block %s'%(g.vaddr_pmap[u], g.vaddr_pmap[v]))
+            if print_backtrace:
+                print(g.backtraces[u])
         # terminate loop search
         raise StopSearch()
 
@@ -158,3 +162,25 @@ class PrintPtrLoop(gdb.Command):
         dfs_search(g, g.root, vis)
 
 PrintPtrLoop()
+
+# Let users specify the display of tracebacks for allocations in pointer loops
+class PtrLoopBacktrace(gdb.Parameter):
+    """Enable printing of allocation backtraces"""
+
+    set_doc = "True to get (verbose) backtraces for each block allocated in a loop"
+    show_doc = "Show whether we display allocation backtraces for blocks in a loop"
+
+    def __init__(self):
+        super(PtrLoopBacktrace, self).__init__("ppl-backtrace",
+                                               gdb.COMMAND_DATA,
+                                               gdb.PARAM_BOOLEAN)
+        PtrLoopBacktrace.printBacktrace = False
+
+    def get_set_string(self):
+        PtrLoopBacktrace.printBacktrace = self.value
+        return 'on' if self.value else 'off'
+
+    def get_show_string(self, svalue):
+        return svalue
+
+PtrLoopBacktrace()
