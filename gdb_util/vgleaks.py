@@ -29,16 +29,16 @@ class StepToLeak(gdb.Command):
         super (StepToLeak, self).__init__ ("stepl", gdb.COMMAND_BREAKPOINTS)
 
     def invoke(self, arg, from_tty):
-        gdb.execute('set logging redirect on', to_string = True)
         result = gdb.execute('mo leak full', False, True)
         while result.find('are definitely lost in loss record') is -1:
             try:
                 gdb.execute('step', to_string = True)  # QUIETLY step
             except gdb.error:
-                print('some error in step')  # BOZO handle
+                print('error while stepping')  # BOZO handle
                 break
             result = gdb.execute('mo leak full', False, True)
-        gdb.execute('set logging redirect off', to_string = True)
         print('loss report:\n%s'%result)
+        print('leak first noticed at:\n')
+        gdb.execute('bt')
 
 StepToLeak()
