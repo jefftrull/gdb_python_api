@@ -47,11 +47,11 @@ class StepToLeak(gdb.Command):
 StepToLeak()
 
 # when you've found a leak this will look for reference loops
-class PrintRefLoop(gdb.Command):
+class PrintPtrLoop(gdb.Command):
     """Find a reference loop in the leak report"""
 
     def __init__ (self):
-        super (PrintRefLoop, self).__init__ ("prl", gdb.COMMAND_DATA)
+        super (PrintPtrLoop, self).__init__ ("ppl", gdb.COMMAND_DATA)
 
     @staticmethod
     def _get_pointers(block_addr):
@@ -98,7 +98,7 @@ class PrintRefLoop(gdb.Command):
     @staticmethod
     def expand_vertex(g, u):
         addr = g.vaddr_pmap[u]
-        ptr_dict = PrintRefLoop._get_pointers(addr)
+        ptr_dict = PrintPtrLoop._get_pointers(addr)
         for ptr in ptr_dict:
             if ptr not in g.addr2v:
                 e = g.create_ptr_edge(ptr, u)
@@ -154,7 +154,7 @@ class PrintRefLoop(gdb.Command):
         g = PointerGraph(m.group(1))
         g.backtraces = g.new_vertex_property('string')
         pred = g.new_vertex_property('int64_t')
-        vis = LoopFindVisitor(g, pred, PrintRefLoop.expand_vertex, PrintRefLoop.report_backedge)
+        vis = LoopFindVisitor(g, pred, PrintPtrLoop.expand_vertex, PrintPtrLoop.report_backedge)
         dfs_search(g, g.root, vis)
 
-PrintRefLoop()
+PrintPtrLoop()
