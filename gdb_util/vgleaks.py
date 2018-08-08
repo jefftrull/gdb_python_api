@@ -126,8 +126,8 @@ class PrintPtrLoop(gdb.Command):
         # now print "path" by edge, reversed, followed by the final edge
         # zip (reversed) path with itself, offset, to get pairs of vertices
         # see "pairwise" recipe in itertools docs
-        sources = reversed(path)
-        targets = reversed(path)
+        sources = iter(path)
+        targets = iter(path)
         next(targets, None)     # shift targets by one so edges line up
         for u, v in zip(sources, targets):
             print('block %s has pointers to block %s'%(g.vaddr_pmap[u], g.vaddr_pmap[v]))
