@@ -150,6 +150,13 @@ class PrintPtrLoop(gdb.Command):
         blockno = m.group(1)
         bl_rpt = gdb.execute('monitor block_list %s'%blockno, to_string = True)
 
+        # get the allocation backtrace for this initial block
+        trace_re = re.compile('(at|by) 0x[0-9A-Fa-f]+: ')
+        backtrace = ''
+        for ln in bl_rpt.splitlines():
+            if trace_re.search(ln):
+                backtrace += ln + '\n'
+
         # extract the first block and call "who_points_at" to get pointers
         # key part is the single indentation - the first entry:
         blre = re.compile('=+[0-9]+=+ (0x[0-9A-F]+)\[')
@@ -157,6 +164,7 @@ class PrintPtrLoop(gdb.Command):
 
         g = PointerGraph(m.group(1))
         g.backtraces = g.new_vertex_property('string')
+        g.backtraces[g.root] = backtrace
         pred = g.new_vertex_property('int64_t')
         vis = LoopFindVisitor(g, pred, PrintPtrLoop.expand_vertex, PrintPtrLoop.report_backedge)
         dfs_search(g, g.root, vis)
