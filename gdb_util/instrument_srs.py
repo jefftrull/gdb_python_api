@@ -1,11 +1,25 @@
 # code to instrument std::sort for my custom type
 # see examples/sort_random_sequence.cpp
 
-import gdb
+import re
 import tempfile
 import os
 from threading import Thread
 from queue import Queue
+from distutils.version import StrictVersion
+
+# This code requires an (as of now) unreleased feature: writable breakpoint commands
+# Produce a helpful error for anyone who tries to use this too soon, with a version check
+
+# get last word of first line of the output of "show version":
+verline = next(iter(gdb.execute('show version', to_string = True).splitlines()))
+ver = verline.split()[-1]
+
+# extract the first two version numbers and compare with 8.2
+ver_match = re.match('^(\d+\.\d+)\.', ver)
+verno = ver_match.group(1)
+if StrictVersion(verno) < StrictVersion('8.2'):
+    raise NotImplementedError('this module relies on writable breakpoint commands, released in gdb 8.2')
 
 class GuiThread(Thread):
     def __init__(self, base_addr, size):
