@@ -77,22 +77,18 @@ class GuiThread(Thread):
             op, a, b = self.messages.get()
             if op is 'swap':
                 # actually seems to understand the size of the elements:
-                print('got command to swap offsets %s and %s'%(a, b))
                 self._perform_swap(a, b)
             elif op is 'move':
-                print('got regular move cmd from %s to %s'%(a, b))
                 self.elements[b] = self.elements[a]
                 self.elements[a] = None
                 self.elements[b].setPos(QPointF(20+20*b, 20))
             elif op is 'move_from_temp':
-                print('moving from temp %s to offset %d'%(a, b))
                 # temporary elements indexed by address, as a string
                 (pos, temp_elt) = self.temp_elements[a]
                 self.temp_elements[a] = (pos, None)
                 temp_elt.setPos(QPointF(20+20*b, 20))
                 self.elements[b] = temp_elt
             elif op is 'move_to_temp':
-                print('moving from offset %d to temp %s'%(a, b))
                 # see if we know of this temp element
                 if b in self.temp_elements:
                     # we already saw this address. reuse its position.
@@ -120,7 +116,7 @@ class GuiThread(Thread):
     def run(self):
         # putting the PyQt imports here avoids the "main thread" warning
         # it seems that merely importing the PyQt modules causes QObject accesses
-        from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem
+        from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem, QDesktopWidget
         from PyQt5.QtCore import Qt, QTimer
         from PyQt5.QtGui  import QColor, QBrush, QPen
 
@@ -137,6 +133,14 @@ class GuiThread(Thread):
                 painter.fillRect(self.rect(), QColor('white'))
                 painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
                 painter.drawRect(self.rect())
+
+        class VectorView(QGraphicsView):
+            def __init__(self):
+                super(VectorView, self).__init__()
+                self.resize(QDesktopWidget().availableGeometry(self).size() * 0.7)
+
+            def resizeEvent(self, e):
+                self.fitInView(self.sceneRect(), Qt.KeepAspectRatio)
 
         self.app = QApplication([])
 
@@ -157,14 +161,14 @@ class GuiThread(Thread):
         # positions for temp elements
         self.temp_elements = {}
 
-        self.view = QGraphicsView()
+        self.view = VectorView()
         self.view.setScene(self.scene)
         self.view.show()
 
         # periodically poll command queue
         self.cmd_poll_timer = QTimer()
         self.cmd_poll_timer.timeout.connect(self._check_for_messages)
-        self.cmd_poll_timer.start(100)   # 100ms doesn't seem too terrible *shrug*
+        self.cmd_poll_timer.start(500)   # throttling to 500ms per action for visibility
 
         self.app.exec_()
 
