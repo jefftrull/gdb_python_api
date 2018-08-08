@@ -12,9 +12,8 @@ struct Person : std::enable_shared_from_this<Person> {
 
     std::shared_ptr<Person> create_employee(std::string name) {
         // can't use make_shared because it cannot access the private ctor :(
-        auto employee = std::shared_ptr<Person>(new Person(std::move(name), shared_from_this()));
-        employees_.push_back(employee);
-        return employee;
+        employees_.emplace_back(new Person(std::move(name), shared_from_this()));
+        return employees_.back();
     }
     std::string name() const { return name_; }
 
