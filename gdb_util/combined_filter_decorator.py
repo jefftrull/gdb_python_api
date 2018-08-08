@@ -1,4 +1,5 @@
 # Frame filter example: remove Boost from stack trace
+import gdb
 import re
 import codecs
 # Python 2/3 way to get "imap", suggested by SO
@@ -30,7 +31,7 @@ class BoostFilter:
 
     def filter(self, frame_iter):
         # compose new iterator that excludes Boost function frames
-        f_iter = filter(lambda f : re.match(r"^std::", f.function()) is None,
+        f_iter = filter(lambda f : re.match(r"^boost::", f.function()) is None,
                         frame_iter)
         # wrap that in our decorator
         return imap(Rot13Decorator, f_iter)
