@@ -20,6 +20,12 @@ if( NOT CMAKE_BUILD_TYPE )
   set( CMAKE_BUILD_TYPE Debug )
 endif()
 
+# if using Clang, also use libc++
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  add_definitions(-stdlib=libc++)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
+endif()
+
 #
 # Code we will be operating on
 #
