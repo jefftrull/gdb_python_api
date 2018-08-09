@@ -1,4 +1,5 @@
 # Frame filter example: remove Boost from stack trace
+import gdb
 import re
 
 # Python 2/3 way to get "imap", suggested by SO

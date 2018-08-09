@@ -1,6 +1,7 @@
 # code to instrument std::sort for my custom type
 # see examples/sort_random_sequence.cpp
 
+import gdb
 import re
 import tempfile
 import os
@@ -151,7 +152,7 @@ class GuiThread(Thread):
         class VectorView(QGraphicsView):
             def __init__(self):
                 super(VectorView, self).__init__()
-                self.resize(QDesktopWidget().availableGeometry(self).size() * 0.7)
+                self.resize(QDesktopWidget().availableGeometry(self).size())
 
             def resizeEvent(self, e):
                 self.fitInView(self.sceneRect(), Qt.KeepAspectRatio)

@@ -13,7 +13,6 @@ class Rot13Decorator(gdb.FrameDecorator.FrameDecorator):
     def __init__(self, fobj):
         super(Rot13Decorator, self).__init__(fobj)
 
-    # boilerplate omitted...
     def function(self):
         name = self.inferior_frame().name()
         return codecs.getencoder('rot13')(name)[0]
