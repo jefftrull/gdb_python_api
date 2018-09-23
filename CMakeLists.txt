@@ -38,7 +38,7 @@ add_executable( swl examples/stl_with_lambda.cpp )
 target_compile_options( swl PRIVATE -std=c++17 )
 
 # code with a leak
-add_executable( leak examples/leaker.cpp )
+add_executable( leak examples/leaker2.cpp )
 
 # using std::sort
 add_executable( srs examples/sort_random_sequence.cpp )
