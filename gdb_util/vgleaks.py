@@ -140,14 +140,14 @@ class PrintPtrLoop(gdb.Command):
         leak_rpt = gdb.execute('monitor leak_check full any', to_string = True)
 
         # extract the loss record number from the leak report
-        rx = re.compile('are definitely lost in loss record ([0-9]+) of')
+        rx = re.compile('are (definitely|possibly) lost in loss record ([0-9]+) of')
         m = rx.search(leak_rpt)
         if not m:
             print('no loops found')
             return
 
         # request block list for that record number
-        blockno = m.group(1)
+        blockno = m.group(2)
         bl_rpt = gdb.execute('monitor block_list %s'%blockno, to_string = True)
 
         # get the allocation backtrace for this initial block
