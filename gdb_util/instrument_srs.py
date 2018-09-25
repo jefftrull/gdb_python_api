@@ -33,6 +33,7 @@ class GuiThread(Thread):
         int_t = gdb.lookup_type('int')
         for idx in range(0, size):
             self.values.append(int((base_addr + idx).dereference().cast(int_t)))
+        self.animations = []
 
     # Front end code
     # These methods run in the gdb thread in response to breakpoints,
@@ -96,12 +97,12 @@ class GuiThread(Thread):
             elif op is 'move':
                 self.elements[b] = self.elements[a]
                 self.elements[a] = None
-                self.elements[b].setPos(QPointF(20+20*b, 20))
+                self._perform_move(self.elements[b], QPointF(20+20*b, 20))
             elif op is 'move_from_temp':
                 # temporary elements indexed by address, as a string
                 (pos, temp_elt) = self.temp_elements[a]
                 self.temp_elements[a] = (pos, None)
-                temp_elt.setPos(QPointF(20+20*b, 20))
+                self._perform_move(temp_elt, QPointF(20+20*b, 20))
                 self.elements[b] = temp_elt
             elif op is 'move_to_temp':
                 # see if we know of this temp element
@@ -110,20 +111,49 @@ class GuiThread(Thread):
                     (pos, temp_elt) = self.temp_elements[b]
                 else:
                     pos = QPointF(20+20*len(self.temp_elements), 60)
-                self.elements[a].setPos(pos)
+                self._perform_move(self.elements[a], pos)
                 self.temp_elements[b] = (pos, self.elements[a])
                 self.elements[a] = None
             else:
                 print('unknown move command from %s to %s'%(a, b))
 
+    def _perform_move(self, a, pos):
+        from PyQt5.QtCore  import QPropertyAnimation
+        # create animation for this move operation
+        anim = QPropertyAnimation(a, b'pos')
+        anim.setDuration(200)
+        anim.setEndValue(pos)
+        anim.start()
+        # the QPropertyAnimation object must outlive this method, so we attach it to this instance
+        # TODO we should really collect it afterwards, perhaps with a handler for the finished() signal...
+        self.animations.append(anim)
+
     def _perform_swap(self, a, b):
+        from PyQt5.QtCore  import QPointF, QPropertyAnimation
+
         elt_a = self.elements[a]
         elt_b = self.elements[b]
         # update positions
-        pos_a = elt_a.pos()
-        pos_b = elt_b.pos()
-        self.elements[b].setPos(pos_a)
-        self.elements[a].setPos(pos_b)
+        pos_a = elt_a.pos
+        pos_b = elt_b.pos
+
+        # animate the exchange: move in an arc above/below a point halfway between
+        pos_between = (pos_a + pos_b) / 2
+        pos_above = QPointF(pos_between.x(), -10)
+        pos_below = QPointF(pos_between.x(), 50)
+        anim_a = QPropertyAnimation(self.elements[a], b'pos')
+        anim_b = QPropertyAnimation(self.elements[b], b'pos')
+        anim_a.setDuration(600)
+        anim_b.setDuration(600)
+        anim_a.setKeyValueAt(0.5, pos_above)
+        anim_b.setKeyValueAt(0.5, pos_below)
+        anim_a.setKeyValueAt(1, pos_b)
+        anim_b.setKeyValueAt(1, pos_a)
+        anim_a.start()
+        anim_b.start()
+        self.animations.append(anim_a)
+        self.animations.append(anim_b)
+
         # update elements list
         self.elements[a] = elt_b
         self.elements[b] = elt_a
@@ -132,7 +162,7 @@ class GuiThread(Thread):
         # putting the PyQt imports here avoids the "main thread" warning
         # it seems that merely importing the PyQt modules causes QObject accesses
         from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem, QDesktopWidget
-        from PyQt5.QtCore import Qt, QTimer
+        from PyQt5.QtCore import Qt, QTimer, QObject
         from PyQt5.QtGui  import QColor, QBrush, QPen
 
         # and that includes class definitions too :-/
@@ -148,6 +178,23 @@ class GuiThread(Thread):
                 painter.fillRect(self.rect(), QColor('white'))
                 painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
                 painter.drawRect(self.rect())
+
+        # animated objects must inherit from QObject
+        # but QGraphicsRectItem does not, and it's too late (post compile) to fix it
+        # so a proxy is used:
+        class AnimProxy(QObject):
+            from PyQt5.QtCore import pyqtProperty, QPointF
+            def __init__(self, obj):
+                super(AnimProxy, self).__init__()
+                self.obj = obj     # the underlying non-QObject with "setPos" method
+
+            @pyqtProperty(QPointF)
+            def pos(self):
+                return self.obj.pos()
+
+            @pos.setter
+            def pos(self, pt):
+                self.obj.setPos(pt)
 
         class VectorView(QGraphicsView):
             def __init__(self):
@@ -169,7 +216,9 @@ class GuiThread(Thread):
         self.elements = []
         for v in self.values:
             elt = Element(idx, v)
-            self.elements.append(elt)
+            # we manipulate position through the AnimProxy (QObject)
+            self.elements.append(AnimProxy(elt))
+            # but QGraphicsScene gets the underlying Element (QGraphicsRectItem)
             self.scene.addItem(elt)
             idx = idx + 1
 
@@ -183,7 +232,7 @@ class GuiThread(Thread):
         # periodically poll command queue
         self.cmd_poll_timer = QTimer()
         self.cmd_poll_timer.timeout.connect(self._check_for_messages)
-        self.cmd_poll_timer.start(500)   # throttling to 500ms per action for visibility
+        self.cmd_poll_timer.start(700)   # throttling to 700ms per action for visibility
 
         self.app.exec_()
 
