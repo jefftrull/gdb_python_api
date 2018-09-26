@@ -17,10 +17,10 @@
 
 using namespace detail;
 
-using Strings = std::vector<std::string>;
-
 int main() {
     // (broken) attempt at lexicographic sort
+
+    using Strings = std::vector<std::string>;
 
     std::vector<Strings> data{
         {"Frodo", "Sam", "Smeagol"},

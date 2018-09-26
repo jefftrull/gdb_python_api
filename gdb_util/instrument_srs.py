@@ -143,8 +143,8 @@ class GuiThread(Thread):
         pos_below = QPointF(pos_between.x(), 50)
         anim_a = QPropertyAnimation(self.elements[a], b'pos')
         anim_b = QPropertyAnimation(self.elements[b], b'pos')
-        anim_a.setDuration(600)
-        anim_b.setDuration(600)
+        anim_a.setDuration(400)
+        anim_b.setDuration(400)
         anim_a.setKeyValueAt(0.5, pos_above)
         anim_b.setKeyValueAt(0.5, pos_below)
         anim_a.setKeyValueAt(1, pos_b)
@@ -236,7 +236,7 @@ class GuiThread(Thread):
         # periodically poll command queue
         self.cmd_poll_timer = QTimer()
         self.cmd_poll_timer.timeout.connect(self._check_for_messages)
-        self.cmd_poll_timer.start(700)   # throttling to 700ms per action for visibility
+        self.cmd_poll_timer.start(500)   # throttling to 700ms per action for visibility
 
         self.app.exec_()
 
