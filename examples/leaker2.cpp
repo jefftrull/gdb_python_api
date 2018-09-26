@@ -1,6 +1,6 @@
 // new idea for leakage example
 #include <functional>
-#include <vector>
+#include <deque>
 #include <memory>
 #include <iostream>
 
@@ -16,14 +16,14 @@ struct TaskList
 
     void doOne() {
         if (!tasks_.empty()) {
-            auto f = tasks_.back();
-            tasks_.pop_back();
+            auto f = tasks_.front();
+            tasks_.front();
             f();
         }
     }
 
 private:
-    vector<function<void()>> tasks_;
+    deque<function<void()>> tasks_;
 
 };
 
@@ -37,6 +37,5 @@ int main() {
                     cout << "task 2\n";
                 });
         });
-
 }
 
