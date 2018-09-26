@@ -163,7 +163,7 @@ class GuiThread(Thread):
         # it seems that merely importing the PyQt modules causes QObject accesses
         from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem, QDesktopWidget
         from PyQt5.QtCore import Qt, QTimer, QObject
-        from PyQt5.QtGui  import QColor, QBrush, QPen, QPainterPath, QPainter
+        from PyQt5.QtGui  import QColor, QBrush, QPen, QPainterPath, QPainter, QFont
 
         # and that includes class definitions too :-/
         class Element(QGraphicsRectItem):
@@ -180,6 +180,7 @@ class GuiThread(Thread):
                 path.addRoundedRect(self.rect(), 2, 2)
                 painter.fillPath(path, QColor('white'))
                 painter.drawPath(path)
+                painter.setFont(QFont('Inconsolata', 9))
                 painter.drawText(self.rect(), Qt.AlignCenter, str(self.value))
 
         # animated objects must inherit from QObject
