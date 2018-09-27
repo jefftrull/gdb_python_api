@@ -75,3 +75,13 @@ End with a line saying just "end".
 ~~~
 
 The stack pointer changes quite frequently so you will probably want to restrict it with a condition like I have above (to `target_fn` and its inlined children).
+
+## Pointer Loop Finding
+
+In combination with valgrind, the command `ppl` ("print pointer loops") gives you a view of any pointer loops between allocated blocks that might be causing memory leaks. To run:
+
+- launch valgrind in gdbserver mode
+- launch gdb as a client (follow directions printed by valgrind)
+- import `gdb_util.vgleaks`
+- when `monitor leak_check` shows you have a leak, run `ppl` and it will print out any circular references it found among the leaked blocks
+- `set ppl-backtrace on` will give you backtraces for the point each block was allocated, as well
