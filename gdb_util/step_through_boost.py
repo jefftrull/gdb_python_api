@@ -28,9 +28,9 @@ class StepThroughBoost(gdb.Command):
                                                gdb.COMMAND_RUNNING)
 
     def invoke(self, arg, from_tty):
-        frame = gdb.selected_frame()
+        frame = gdb.newest_frame()
         while re.match('boost::', frame.name()):
             gdb.execute('step', to_string=True)
-            frame = gdb.selected_frame()
+            frame = gdb.newest_frame()
 
 StepThroughBoost()   # registers command

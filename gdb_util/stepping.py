@@ -40,7 +40,7 @@ class StepUser (gdb.Command):
         parent = None
         try:
             # find the AST node closest to the beginning of the current line
-            frame = gdb.selected_frame()
+            frame = gdb.newest_frame()
             line = frame.find_sal().line
             fname = frame.find_sal().symtab.filename
             compdb_fname = './compile_commands.json'
@@ -90,7 +90,7 @@ class StepUser (gdb.Command):
         # or the end of the frame, if we are the last
         nextStmt = getASTSibling(parent, node)
         if nextStmt is None:
-            if gdb.selected_frame().older() is not None:
+            if gdb.newest_frame().older() is not None:
                 # create default finish breakpoint
                 StepUser.finishBP = gdb.FinishBreakpoint(internal=True)  # on by default in case no other breakpoints happen
             else:
