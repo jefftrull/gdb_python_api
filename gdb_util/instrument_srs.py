@@ -30,16 +30,7 @@ from distutils.version import StrictVersion
 # This code requires an (as of now) unreleased feature: writable breakpoint commands
 # Produce a helpful error for anyone who tries to use this too soon, with a version check
 
-# BOZO we could use gdb.VERSION here
-
-# get last word of first line of the output of "show version":
-verline = next(iter(gdb.execute('show version', to_string = True).splitlines()))
-ver = verline.split()[-1]
-
-# extract the first two version numbers and compare with 8.2
-ver_match = re.match(r'^(\d+.\d+)', ver)
-verno = ver_match.group(1)
-if StrictVersion(verno) < StrictVersion('8.2'):
+if StrictVersion(gdb.VERSION) < StrictVersion('8.2'):
     raise NotImplementedError('this module relies on writable breakpoint commands, released in gdb 8.2')
 
 
