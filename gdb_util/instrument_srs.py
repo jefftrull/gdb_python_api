@@ -23,8 +23,6 @@
 
 import gdb
 import re
-import tempfile
-import os
 from threading import Thread
 from queue import Queue
 from distutils.version import StrictVersion
@@ -39,10 +37,11 @@ verline = next(iter(gdb.execute('show version', to_string = True).splitlines()))
 ver = verline.split()[-1]
 
 # extract the first two version numbers and compare with 8.2
-ver_match = re.match('^(\d+\.\d+)\.', ver)
+ver_match = re.match(r'^(\d+.\d+)', ver)
 verno = ver_match.group(1)
 if StrictVersion(verno) < StrictVersion('8.2'):
     raise NotImplementedError('this module relies on writable breakpoint commands, released in gdb 8.2')
+
 
 class GuiThread(Thread):
     def __init__(self, base_addr, size):
@@ -107,7 +106,7 @@ class GuiThread(Thread):
     # Only standard Python types cross the barrier
 
     def _check_for_messages(self):
-        from PyQt5.QtCore  import QPointF
+        from PyQt5.QtCore import QPointF
 
         # poll command queue
         # not ideal but safe. OK for now.
@@ -137,10 +136,10 @@ class GuiThread(Thread):
                 self.temp_elements[b] = (pos, self.elements[a])
                 self.elements[a] = None
             else:
-                print('unknown move command from %s to %s'%(a, b))
+                print('unknown move command from %s to %s' % (a, b))
 
     def _perform_move(self, a, pos):
-        from PyQt5.QtCore  import QPropertyAnimation
+        from PyQt5.QtCore import QPropertyAnimation
         # create animation for this move operation
         anim = QPropertyAnimation(a, b'pos')
         anim.setDuration(200)
@@ -151,7 +150,7 @@ class GuiThread(Thread):
         self.animations.append(anim)
 
     def _perform_swap(self, a, b):
-        from PyQt5.QtCore  import QPointF, QPropertyAnimation
+        from PyQt5.QtCore import QPointF, QPropertyAnimation
 
         elt_a = self.elements[a]
         elt_b = self.elements[b]
@@ -185,7 +184,7 @@ class GuiThread(Thread):
         # it seems that merely importing the PyQt modules causes QObject accesses
         from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsRectItem, QDesktopWidget
         from PyQt5.QtCore import Qt, QTimer, QObject
-        from PyQt5.QtGui  import QColor, QBrush, QPen, QPainterPath, QPainter, QFont
+        from PyQt5.QtGui import QColor, QBrush, QPen, QPainterPath, QPainter, QFont
 
         # and that includes class definitions too :-/
         class Element(QGraphicsRectItem):
@@ -210,6 +209,7 @@ class GuiThread(Thread):
         # so a proxy is used:
         class AnimProxy(QObject):
             from PyQt5.QtCore import pyqtProperty, QPointF
+
             def __init__(self, obj):
                 super(AnimProxy, self).__init__()
                 self.obj = obj     # the underlying non-QObject with "setPos" method
@@ -269,8 +269,8 @@ class GuiThread(Thread):
 
 # my special swap, initially disabled to avoid the call to std::shuffle
 swap_bp = gdb.Breakpoint('swap(int_wrapper_t&, int_wrapper_t&)')
-swap_bp.enabled = False # off until we get to our algorithm of interest
-swap_bp.silent = True   # don't spam user
+swap_bp.enabled = False  # off until we get to our algorithm of interest
+swap_bp.silent = True    # don't spam user
 
 # move ctor
 move_bp = gdb.Breakpoint('int_wrapper_t::int_wrapper_t(int_wrapper_t&&)')
