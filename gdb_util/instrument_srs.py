@@ -22,13 +22,9 @@
 # SOFTWARE.
 
 import gdb
-import re
 from threading import Thread
 from queue import Queue
 from distutils.version import StrictVersion
-
-# This code requires an (as of now) unreleased feature: writable breakpoint commands
-# Produce a helpful error for anyone who tries to use this too soon, with a version check
 
 if StrictVersion(gdb.VERSION) < StrictVersion('8.2'):
     raise NotImplementedError('this module relies on writable breakpoint commands, released in gdb 8.2')
