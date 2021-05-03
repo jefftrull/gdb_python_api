@@ -67,19 +67,29 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
         else:
             args.append(arg)
 
-    translation_unit = index.parse(tu_fname, args)
-    # TODO: this would be an excellent place to cache the parse results
-    # compilation could take a noticeable amount of time
 
-    if (len(translation_unit.diagnostics) > 0):
-        print(['%s:%s'%(x.category_name, x.spelling) for x in translation_unit.diagnostics])
-        raise RuntimeError('Failure during libclang parsing')
+    try:
+        translation_unit = index.parse(tu_fname, args)
 
-    # we can go from TU's primary cursor to a specific file location with:
-    loc = cindex.SourceLocation.from_position(translation_unit,
-                                              translation_unit.get_file(fname),
-                                              line, column)
-    cur = cindex.Cursor.from_location(translation_unit, loc)
+        # TODO: this would be an excellent place to cache the parse results
+        # compilation could take a noticeable amount of time
+
+        if (len(translation_unit.diagnostics) > 0):
+            print(['%s:%s'%(x.category_name, x.spelling) for x in translation_unit.diagnostics])
+            raise RuntimeError('Failure during libclang parsing')
+
+        # we can go from TU's primary cursor to a specific file location with:
+        loc = cindex.SourceLocation.from_position(translation_unit,
+                                                  translation_unit.get_file(fname),
+                                                  line, column)
+        cur = cindex.Cursor.from_location(translation_unit, loc)
+
+        return cur
+
+    except clang.cindex.TranslationUnitLoadError as e:
+        print('TranslationUnitLoadError while parsing %s with args:' % tu_fname)
+        print(args)
+        raise
 
     return cur
 
