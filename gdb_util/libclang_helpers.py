@@ -86,12 +86,11 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
 
         return cur
 
-    except clang.cindex.TranslationUnitLoadError as e:
+    except cindex.TranslationUnitLoadError as e:
         print('TranslationUnitLoadError while parsing %s with args:' % tu_fname)
         print(args)
         raise
 
-    return cur
 
 # supply the next sibling of a statement (for e.g. implementing "next")
 def getASTSibling(parent, node):
