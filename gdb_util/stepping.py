@@ -237,14 +237,22 @@ class StepUser (gdb.Command):
             for arg in node.get_arguments():
                 breakpoints = breakpoints + StepUser._breakInFunctions(arg)
 
-        if node.kind == CursorKind.DECL_REF_EXPR:
+        elif node.kind == CursorKind.DECL_REF_EXPR:
             # probably an object argument
             # check type against regex
             decl = node.referenced.type.get_declaration()
             if not re.match(StepUser.stepRegex, getFuncName(decl)):
                 # locate member function bodies and breakpoint
                 members = [next(x.get_children()) for x in StepUser._getMethodBodies(decl)]
-                breakpoints = breakpoints + [(x.location.file.name, x.location.line) for x in members]
+                breakpoints.append = (breakpoints +
+                                      [(x.location.file.name, x.location.line) for x in members])
+
+        elif node.kind == CursorKind.LAMBDA_EXPR:
+            # break on first body statement, if present
+            body = list(node.get_children())[-1]
+            if body.kind == CursorKind.COMPOUND_STMT and len(list(body.get_children())) > 0:
+                first_stmt = next(body.get_children())
+                breakpoints.append((first_stmt.location.file.name, first_stmt.location.line))
 
         return breakpoints
 StepUser ()
