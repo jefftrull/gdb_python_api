@@ -109,7 +109,7 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
 def getASTSibling(parent, node):
     """Return the next sibling of a node in the AST, if present"""
 
-    if parent.kind is not cindex.CursorKind.COMPOUND_STMT:
+    if not parent or parent.kind is not cindex.CursorKind.COMPOUND_STMT:
         # don't know what to do here
         raise RuntimeError('AST node on line %d is not a child of a compound statement - cannot determine next statement'%node.location.line)
     sibling = None
