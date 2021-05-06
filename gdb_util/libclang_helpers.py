@@ -22,6 +22,19 @@
 from clang import cindex
 from os import path
 
+# CompilationDatabase.getCompileCommands() will try to "infer" build commands
+# for files that are not present in the compilation database - including headers,
+# surprisingly. See https://bugs.llvm.org/show_bug.cgi?id=50249
+# We don't want this, so here's our alternative implementation:
+
+def _getCompileCommands(compdb, fname):
+    """Return a list of commands to build fname. If fname is not found in compdb, return None"""
+
+    all_cmds = compdb.getAllCompileCommands()
+    cmds = [cmd for cmd in all_cmds if cmd.filename == fname]
+    return cmds if len(cmds) > 0 else None
+
+
 def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_commands.json'):
     """Find the enclosing AST node of a given location
 
@@ -45,7 +58,7 @@ def getASTNode(fname, line, column, tu_fname = None, compdb_fname = './compile_c
     # Step 2: query compilation flags
     if tu_fname is None:        # indicates file is the translation unit
         tu_fname = fname
-    cmds = compdb.getCompileCommands(tu_fname)
+    cmds = _getCompileCommands(compdb, tu_fname)
 
     # getCompileCommands signals "not found" with None result
     if cmds is None:
@@ -132,7 +145,7 @@ def findFirstTU(files, compdb_fname='./compile_commands.json'):
         raise RuntimeError('Could not load compilation database for %s'%compilation_database_path)
 
     for fn in files:
-        cmds = compdb.getCompileCommands(fn)
+        cmds = _getCompileCommands(compdb, fn)
         if cmds is not None:
             return fn
     return None
