@@ -31,7 +31,7 @@ def _getCompileCommands(compdb, fname):
     """Return a list of commands to build fname. If fname is not found in compdb, return None"""
 
     all_cmds = compdb.getAllCompileCommands()
-    cmds = [cmd for cmd in all_cmds if cmd.filename == fname]
+    cmds = [cmd for cmd in all_cmds if cmd.filename == path.abspath(fname)]
     return cmds if len(cmds) > 0 else None
 
 
