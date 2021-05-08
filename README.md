@@ -3,6 +3,11 @@ Experiments with the GDB Python API
 
 Usage: `PYTHONPATH=/path/to/gdb_python_api gdb ...`
 
+
+## Note: libClang version 11.0 has a bug - don't use it
+
+For detailed information see [this commit](https://github.com/llvm/llvm-project/commit/bbdbd020d2c2f315ed1545b23c23ec6ff1abc022), which fixed the problem and was released in 11.1. Please use that version instead.
+
 ## Backtrace Cleanup for C++ template libraries
 
 Backtraces from heavily templated library code can be tough for users to understand. Through the use of the [frame filter](https://sourceware.org/gdb/onlinedocs/gdb/Frame-Filter-API.html#Frame-Filter-API) and [frame decorator](https://sourceware.org/gdb/onlinedocs/gdb/Frame-Decorator-API.html#Frame-Decorator-API) APIs we can filter out library internals and display more readable aliases for common types.
