@@ -23,7 +23,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
-#include <experimental/filesystem>
+#include <filesystem>
 
 #include <boost/preprocessor/stringize.hpp>
 
@@ -80,7 +80,7 @@ private:
 };
 
 int main() {
-    namespace fs = std::experimental::filesystem;
+    namespace fs = std::filesystem;
 
     CXCompilationDatabase_Error err;
     CXCompilationDatabase cdb = clang_CompilationDatabase_fromDirectory(".", &err);

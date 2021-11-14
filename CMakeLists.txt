@@ -2,7 +2,7 @@ cmake_minimum_required( VERSION 3.9 )
 
 PROJECT( gdb_python_api )
 
-set( CMAKE_CXX_STANDARD 14 )
+set( CMAKE_CXX_STANDARD 17 )
 
 # Create a compilation database (compile_commands.json) for the use of Clang tools
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
